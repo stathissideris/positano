@@ -1,8 +1,8 @@
 # positano
 
-"Positano bites deep. It is a dream place that isn't quite real when
-you are there and becomes beckoningly real after you have gone." --
-John Steinbeck
+> "Positano bites deep. It is a dream place that isn't quite real when
+> you are there and becomes beckoningly real after you have gone." --
+> John Steinbeck
 
 Provenance system for Clojure code. This is a documentation-first
 project, so there is no code yet.
