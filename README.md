@@ -72,6 +72,13 @@ exercised, and therefore it can be used as a test-coverage metric.
 * Utility code for extracting Prismatic schemas and Typed Clojure
   types from execution information.
 
+## Next steps/roadmap
+
+* Add timestamps to tracing
+* Function to trace/untrace whole codebase (consider including clojure.core)
+* Plug in-memory datomic to tracing
+* Explore tracing individual S-expressions
+
 ## License
 
 Copyright © 2015 Efstathios Sideris
