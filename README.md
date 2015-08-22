@@ -78,6 +78,9 @@ exercised, and therefore it can be used as a test-coverage metric.
 * Function to trace/untrace whole codebase (consider including clojure.core)
 * Plug in-memory datomic to tracing
 * Explore tracing individual S-expressions
+* Utilities for deriving schemas and type annotations
+* Run clojure.core tests, derive type annotations and compare to
+  existing (hand-crafted) annotations.
 
 ## License
 
