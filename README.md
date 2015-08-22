@@ -5,7 +5,7 @@
 > John Steinbeck
 
 Provenance system for Clojure code. This is a documentation-first
-project, so there is no code yet.
+project, so there very little code right now.
 
 ## Provenance
 
