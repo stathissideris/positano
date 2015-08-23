@@ -1,8 +1,9 @@
 ;;this is a "fork" of https://github.com/clojure/tools.trace/blob/master/src/main/clojure/clojure/tools/trace.clj
 (ns positano.trace
+  (:require [clojure.core.async :as async :refer [>!!]])
   (:use [clojure.pprint]))
 
-(def DB (atom []))
+(def event-channel (atom nil))
 
 (def ^{:doc "Current stack depth of traced function calls." :private true :dynamic true}
       *trace-depth* 0)
@@ -30,16 +31,25 @@ affecting the result."
   []
   (apply str (take *trace-depth* (repeat "| "))))
 
+(defn record-event [e]
+  (if @event-channel
+    (>!! @event-channel e)
+    (println "ERROR - positano event channel not initialised"))) ;;TODO log this instead of printing
+
+(defn base-trace []
+  {:timestamp (System/currentTimeMillis)})
+
 (defn ^{:skip-wiki true} trace-fn-call
   "Traces a single call to a function f with args. 'name' is the
 symbol name of the function."
   [name f args]
-  (let [id (gensym "t")]
-    (swap! DB conj {:type :fn-call :id id :fn name :args args})
+  (let [name (str name)
+        id   (str (gensym "t"))]
+    (record-event (merge (base-trace) {:type :fn-call :id id :fn name :args args}))
     ;;(tracer id (str (trace-indent) (pr-str (cons name args))))
     (let [value (binding [*trace-depth* (inc *trace-depth*)]
                   (apply f args))]
-      (swap! DB conj {:type :fn-return :id id :fn name :value value})
+      (record-event (merge (base-trace) {:type :fn-return :id id :fn name :value value}))
       ;;(tracer id (str (trace-indent) "=> " (pr-str value)))
       value)))
 
