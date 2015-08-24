@@ -43,10 +43,10 @@ query them all at once.
 
 Information about the parameters passed to functions can be
 generalised to show the shape of data generally expected by the
-function. This can then be used to derive a Prismatic schema or a
+function. This can then be used to infer a Prismatic schema or a
 Typed Clojure type which can be incorporated into the code. This is
-similar to what F# type providers which derive types from example
-data.
+similar to what F# type providers which [infer types from example
+data](http://fsharp.github.io/FSharp.Data/library/JsonProvider.html).
 
 There is a certain class of errors that occurs in dynamically typed
 languages where a function is passed data of the correct shape in most
