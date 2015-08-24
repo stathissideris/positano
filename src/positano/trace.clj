@@ -1,6 +1,7 @@
 ;;this is a "fork" of https://github.com/clojure/tools.trace/blob/master/src/main/clojure/clojure/tools/trace.clj
 (ns positano.trace
   (:require [clojure.core.async :as async :refer [>!!]])
+  (:require [positano.datomic :as datomic])
   (:use [clojure.pprint]))
 
 (def event-channel (atom nil))
@@ -10,7 +11,12 @@
 
 (def ^{:doc "Forms to ignore when tracing forms." :private true}
       ignored-form? '#{def quote var try monitor-enter monitor-exit assert})
-    
+
+(defn init-datomic []
+  (let [conn (datomic/memory-connection)]
+    (reset! event-channel (datomic/event-channel conn))
+    conn))
+
 (defn ^{:private true} tracer
   "This function is called by trace. Prints to standard output, but
 may be rebound to do anything you like. 'name' is optional."
@@ -32,25 +38,33 @@ affecting the result."
   (apply str (take *trace-depth* (repeat "| "))))
 
 (defn record-event [e]
+  ;;TODO check events using prismatic schema here
   (if @event-channel
     (>!! @event-channel e)
     (println "ERROR - positano event channel not initialised"))) ;;TODO log this instead of printing
 
 (defn base-trace []
-  {:timestamp (System/currentTimeMillis)})
+  {:timestamp (java.util.Date.)})
 
 (defn ^{:skip-wiki true} trace-fn-call
   "Traces a single call to a function f with args. 'name' is the
 symbol name of the function."
-  [name f args]
-  (let [name (str name)
-        id   (str (gensym "t"))]
-    (record-event (merge (base-trace) {:type :fn-call :id id :fn name :args args}))
-    ;;(tracer id (str (trace-indent) (pr-str (cons name args))))
+  [name ns f args]
+  (let [id (gensym "t")]
+    (record-event (merge (base-trace)
+                         {:type :fn-call
+                          :id id
+                          :fn-name name
+                          :ns ns
+                          :args args}))
     (let [value (binding [*trace-depth* (inc *trace-depth*)]
                   (apply f args))]
-      (record-event (merge (base-trace) {:type :fn-return :id id :fn name :value value}))
-      ;;(tracer id (str (trace-indent) "=> " (pr-str value)))
+      (record-event (merge (base-trace)
+                           {:type :fn-return
+                            :id id
+                            :fn-name name
+                            :ns ns
+                            :return-value value}))
       value)))
 
 (defmacro deftrace
@@ -65,20 +79,7 @@ symbol name of the function."
        (declare ~name)
        (let [f# (fn ~@fn-form)]
          (defn ~name ~doc-string [& args#]
-           (trace-fn-call '~name f# args#))))))
-
-(defmacro dotrace
-  "Given a sequence of function identifiers, evaluate the body
-expressions in an environment in which the identifiers are bound to
-the traced functions. Does not work on inlined functions,
-such as clojure.core/+"
-  [fnames & exprs]
-  `(binding [~@(interleave fnames
-                           (for [fname fnames]
-                             `(let [f# @(var ~fname)]
-                                (fn [& args#]
-                                  (trace-fn-call '~fname f# args#)))))]
-     ~@exprs))
+           (trace-fn-call '~name *ns* f# args#))))))
 
 (declare trace-form)
 (defmulti trace-special-form (fn [form] (first form)))
@@ -287,7 +288,7 @@ such as clojure.core/+"
                vname (symbol (str ns "/" s))]
            (doto v
              (alter-var-root #(fn tracing-wrapper [& args]
-                                (trace-fn-call vname % args)))
+                                (trace-fn-call vname *ns* % args)))
              (alter-meta! assoc ::traced f)))))))
 
 (defn ^{:skip-wiki true} untrace-var*

@@ -1,5 +1,6 @@
 (ns positano.core
-  (:require [positano.trace :as trace]))
+  (:require [positano.trace :as trace]
+            [datomic.api :as d]))
 
 (trace/deftrace bar [x]
   (* x 3))
@@ -11,9 +12,12 @@
   (bar x))
 
 (comment
+  (def conn (trace/init-datomic))
   (foo 10)
-  (in-ns 'positano.trace)
-  (clojure.pprint/pprint @DB)
+  (let [db (d/db conn)
+        res (d/q '[:find ?e :where [?e :event/type :fn-return]] db)]
+    (for [r res]
+      (d/touch (d/entity db (first r)))))
 
   ;;produces:
   [{:type :fn-call, :id t17298, :fn foo, :args (10)}

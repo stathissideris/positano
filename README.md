@@ -74,7 +74,8 @@ exercised, and therefore it can be used as a test-coverage metric.
 
 ## Next steps/roadmap
 
-* Add timestamps to tracing
+* Add namespace information to tracing
+* Add caller information to function call events
 * Function to trace/untrace whole codebase (consider including clojure.core)
 * Plug in-memory datomic to tracing
 * Explore tracing individual S-expressions
