@@ -44,7 +44,9 @@ query them all at once.
 Information about the parameters passed to functions can be
 generalised to show the shape of data generally expected by the
 function. This can then be used to derive a Prismatic schema or a
-Typed Clojure type which can be incorporated into the code.
+Typed Clojure type which can be incorporated into the code. This is
+similar to what F# type providers which derive types from example
+data.
 
 There is a certain class of errors that occurs in dynamically typed
 languages where a function is passed data of the correct shape in most
@@ -75,7 +77,8 @@ exercised, and therefore it can be used as a test-coverage metric.
 ## Next steps/roadmap
 
 * Add namespace information to tracing
-* Add caller information to function call events
+* Add caller information to function call events and link it via datomic refs
+* Link fn-call/fn-return events via datomic refs
 * Function to trace/untrace whole codebase (consider including clojure.core)
 * Plug in-memory datomic to tracing
 * Explore tracing individual S-expressions
