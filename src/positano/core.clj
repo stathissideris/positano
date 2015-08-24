@@ -16,7 +16,7 @@
   (foo 10)
   (def r
     (let [db (d/db conn)
-          res (d/q '[:find ?e :where [?e :event/type :fn-call]] db)]
+          res (d/q '[:find ?e :where [?e :event/type _]] db)]
       (for [r res]
         (d/touch (d/entity db (first r))))))
 

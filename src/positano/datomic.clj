@@ -37,6 +37,12 @@
     :db/index true
     :db.install/_attribute :db.part/db}
    {:db/id #db/id[:db.part/db]
+    :db/ident :event/thread
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
+    :db/index true
+    :db.install/_attribute :db.part/db}
+   {:db/id #db/id[:db.part/db]
     :db/ident :event/return-value
     :db/valueType :db.type/string
     :db/cardinality :db.cardinality/one
@@ -97,7 +103,8 @@
       :event/id (str (:id e))
       :event/timestamp (:timestamp e)
       :event/fn-name (str (:fn-name e))
-      :event/ns (str (:ns e))}
+      :event/ns (str (:ns e))
+      :event/thread (:thread e)}
      (when (seq (:args e))
        {:event/fn-args (map (fn [pos val]
                               {:fn-arg/position pos
@@ -112,12 +119,13 @@
   (let [id (str (:id e))
         call-event-id (return-id->call-id id)]
     [{:db/id #db/id[:db.part/user -1]
-       :event/type :fn-return
-       :event/id id
-       :event/timestamp (:timestamp e)
-       :event/fn-name (str (:fn-name e))
-       :event/ns (str (:ns e))
-       :event/return-value (pr-str (:return-value e))
+      :event/type :fn-return
+      :event/id id
+      :event/timestamp (:timestamp e)
+      :event/fn-name (str (:fn-name e))
+      :event/ns (str (:ns e))
+      :event/thread (:thread e)
+      :event/return-value (pr-str (:return-value e))
       :event/fn-entry [:event/id call-event-id]}
      {:db/id [:event/id call-event-id]
       :event/fn-return #db/id[:db.part/user -1]}]))

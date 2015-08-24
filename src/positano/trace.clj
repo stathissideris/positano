@@ -50,12 +50,14 @@ affecting the result."
   "Traces a single call to a function f with args. 'name' is the
 symbol name of the function."
   [name ns f args]
-  (let [id (gensym "")]
+  (let [id        (gensym "")
+        thread-id (.getId (Thread/currentThread))]
     (record-event (merge (base-trace)
                          {:type :fn-call
                           :id (str "c" id)
                           :fn-name name
                           :ns ns
+                          :thread thread-id
                           :args args}))
     (let [value (binding [*trace-depth* (inc *trace-depth*)]
                   (apply f args))]
@@ -64,6 +66,7 @@ symbol name of the function."
                             :id (str "r" id)
                             :fn-name name
                             :ns ns
+                            :thread thread-id
                             :return-value value}))
       value)))
 
