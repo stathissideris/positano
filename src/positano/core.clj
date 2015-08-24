@@ -14,10 +14,11 @@
 (comment
   (def conn (trace/init-datomic))
   (foo 10)
-  (let [db (d/db conn)
-        res (d/q '[:find ?e :where [?e :event/type :fn-return]] db)]
-    (for [r res]
-      (d/touch (d/entity db (first r)))))
+  (def r
+    (let [db (d/db conn)
+          res (d/q '[:find ?e :where [?e :event/type :fn-call]] db)]
+      (for [r res]
+        (d/touch (d/entity db (first r))))))
 
   ;;produces:
   [{:type :fn-call, :id t17298, :fn foo, :args (10)}

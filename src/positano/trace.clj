@@ -50,10 +50,10 @@ affecting the result."
   "Traces a single call to a function f with args. 'name' is the
 symbol name of the function."
   [name ns f args]
-  (let [id (gensym "t")]
+  (let [id (gensym "")]
     (record-event (merge (base-trace)
                          {:type :fn-call
-                          :id id
+                          :id (str "c" id)
                           :fn-name name
                           :ns ns
                           :args args}))
@@ -61,7 +61,7 @@ symbol name of the function."
                   (apply f args))]
       (record-event (merge (base-trace)
                            {:type :fn-return
-                            :id id
+                            :id (str "r" id)
                             :fn-name name
                             :ns ns
                             :return-value value}))

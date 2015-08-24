@@ -45,7 +45,7 @@ Information about the parameters passed to functions can be
 generalised to show the shape of data generally expected by the
 function. This can then be used to infer a Prismatic schema or a
 Typed Clojure type which can be incorporated into the code. This is
-similar to what F# type providers which [infer types from example
+similar to F# type providers which [infer types from example
 data](http://fsharp.github.io/FSharp.Data/library/JsonProvider.html).
 
 There is a certain class of errors that occurs in dynamically typed
@@ -76,9 +76,7 @@ exercised, and therefore it can be used as a test-coverage metric.
 
 ## Next steps/roadmap
 
-* Add namespace information to tracing
 * Add caller information to function call events and link it via datomic refs
-* Link fn-call/fn-return events via datomic refs
 * Function to trace/untrace whole codebase (consider including clojure.core)
 * Plug in-memory datomic to tracing
 * Explore tracing individual S-expressions

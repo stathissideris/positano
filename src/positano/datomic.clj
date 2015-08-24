@@ -16,6 +16,7 @@
     :db/valueType :db.type/string
     :db/cardinality :db.cardinality/one
     :db/index true
+    :db/unique :db.unique/value
     :db.install/_attribute :db.part/db}
    {:db/id #db/id[:db.part/db]
     :db/ident :event/timestamp
@@ -41,6 +42,23 @@
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}
 
+   ;;refs
+   {:db/id #db/id[:db.part/db]
+    :db/ident :event/fn-entry
+    :db/valueType :db.type/ref
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   {:db/id #db/id[:db.part/db]
+    :db/ident :event/fn-return
+    :db/valueType :db.type/ref
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   {:db/id #db/id[:db.part/db]
+    :db/ident :event/fn-caller
+    :db/valueType :db.type/ref
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   
    ;;fn args
    {:db/id #db/id[:db.part/db]
     :db/ident :event/fn-args
@@ -69,32 +87,40 @@
       @(d/transact conn schema)
       conn)))
 
-(defmulti to-transaction :type)
+(defmulti to-transactions :type)
 
-(defmethod to-transaction :fn-call
+(defmethod to-transactions :fn-call
   [e]
-  (merge
-   {:db/id #db/id[:db.part/user]
-    :event/type :fn-call
-    :event/id (str (:id e))
-    :event/timestamp (:timestamp e)
-    :event/fn-name (str (:fn-name e))
-    :event/ns (str (:ns e))}
-   (when (seq (:args e))
-     {:event/fn-args (map (fn [pos val]
-                            {:fn-arg/position pos
-                             :fn-arg/value (pr-str val)})
-                          (range) (:args e))})))
+  [(merge
+     {:db/id #db/id[:db.part/user]
+      :event/type :fn-call
+      :event/id (str (:id e))
+      :event/timestamp (:timestamp e)
+      :event/fn-name (str (:fn-name e))
+      :event/ns (str (:ns e))}
+     (when (seq (:args e))
+       {:event/fn-args (map (fn [pos val]
+                              {:fn-arg/position pos
+                               :fn-arg/value (pr-str val)})
+                            (range) (:args e))}))])
 
-(defmethod to-transaction :fn-return
+(defn- return-id->call-id [id]
+  (str "c" (subs id 1)))
+
+(defmethod to-transactions :fn-return
   [e]
-  {:db/id #db/id[:db.part/user]
-   :event/type :fn-return
-   :event/id (str (:id e))
-   :event/timestamp (:timestamp e)
-   :event/fn-name (str (:fn-name e))
-   :event/ns (str (:ns e))
-   :event/return-value (pr-str (:return-value e))})
+  (let [id (str (:id e))
+        call-event-id (return-id->call-id id)]
+    [{:db/id #db/id[:db.part/user -1]
+       :event/type :fn-return
+       :event/id id
+       :event/timestamp (:timestamp e)
+       :event/fn-name (str (:fn-name e))
+       :event/ns (str (:ns e))
+       :event/return-value (pr-str (:return-value e))
+      :event/fn-entry [:event/id call-event-id]}
+     {:db/id [:event/id call-event-id]
+      :event/fn-return #db/id[:db.part/user -1]}]))
 
 (defn event-channel
   [conn]
@@ -102,7 +128,7 @@
     (thread
       (loop []
         (try
-          @(d/transact conn [(to-transaction (<!! channel))])
+          @(d/transact conn (to-transactions (<!! channel)))
           (catch Exception e
             (println "ERROR" (.getMessage e))))
         (recur)))
