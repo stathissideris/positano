@@ -7,30 +7,32 @@
   (inc x))
 
 (trace/deftrace bar [x]
-  (* (baz x) 3))
+  (* (baz (/ x 2.0)) 3))
 
 (trace/deftrace foo
   "I don't do a whole lot."
   [x]
-  (println x "Hello, World!")
-  (bar x))
+  (println "Hello, World!")
+  (bar (first x)))
 
 (comment
   (def conn (trace/init-db))
-  (foo 10)
-  (def r
-    (let [db (d/db conn)
-          res (d/q '[:find ?e :where [?e :event/type _]] db)]
-      (for [r res]
-        (d/touch (d/entity db (first r))))))
+  (foo [5 10 20 40])
+
   (def r
     (let [db (d/db conn)
           res (d/q '[:find ?e :where [?e :event/fn-name "baz"]] db)]
       (for [r res]
         (d/touch (d/entity db (first r))))))
 
-  ;;produces:
-  [{:type :fn-call, :id t17298, :fn foo, :args (10)}
-   {:type :fn-call, :id t17299, :fn bar, :args (10)}
-   {:type :fn-return, :id t17299, :fn bar, :value 30}
-   {:type :fn-return, :id t17298, :fn foo, :value 30}])
+  (-> r first q/stack q/print-stack)
+
+  ;;prints:
+
+  ;; (foo [5 10 20 40])
+  ;;   (bar 5)
+  ;;     (baz 2.5)
+  ;;     => 3.5
+  ;;   => 10.5
+  ;; => 10.5
+  )
