@@ -6,6 +6,8 @@
 
 (def event-channel (atom nil))
 
+(def stacks (atom {}))
+
 (def ^{:doc "Current stack depth of traced function calls." :private true :dynamic true}
       *trace-depth* 0)
 
@@ -46,6 +48,23 @@ affecting the result."
 (defn base-trace []
   {:timestamp (java.util.Date.)})
 
+;; stack tracking functions (track who calls what)
+(defn- maybe-init-thread-stack! [thread-id]
+  (when-not (get @stacks thread-id)
+    (swap! stacks assoc thread-id (atom (list)))))
+
+(defn- push-id-to-stack! [thread-id event-id]
+  (swap! (get @stacks thread-id) (fn [s] (cons event-id s))))
+
+(defn- pop-stack! [thread-id]
+  (swap! (get @stacks thread-id) rest))
+
+(defn- current-caller [thread-id]
+  (when-let [stack (get @stacks thread-id)]
+    (first @stack)))
+
+;;
+
 (defn ^{:skip-wiki true} trace-fn-call
   "Traces a single call to a function f with args. 'name' is the
 symbol name of the function."
@@ -58,9 +77,13 @@ symbol name of the function."
                           :fn-name name
                           :ns ns
                           :thread thread-id
+                          :fn-caller (when-let [caller (current-caller thread-id)] (str "c" caller))
                           :args args}))
+    (maybe-init-thread-stack! thread-id)
+    (push-id-to-stack! thread-id id)
     (let [value (binding [*trace-depth* (inc *trace-depth*)]
                   (apply f args))]
+      (pop-stack! thread-id)
       (record-event (merge (base-trace)
                            {:type :fn-return
                             :id (str "r" id)

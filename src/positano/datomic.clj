@@ -98,18 +98,20 @@
 (defmethod to-transactions :fn-call
   [e]
   [(merge
-     {:db/id #db/id[:db.part/user]
-      :event/type :fn-call
-      :event/id (str (:id e))
-      :event/timestamp (:timestamp e)
-      :event/fn-name (str (:fn-name e))
-      :event/ns (str (:ns e))
-      :event/thread (:thread e)}
-     (when (seq (:args e))
-       {:event/fn-args (map (fn [pos val]
-                              {:fn-arg/position pos
-                               :fn-arg/value (pr-str val)})
-                            (range) (:args e))}))])
+    {:db/id #db/id[:db.part/user]
+     :event/type :fn-call
+     :event/id (str (:id e))
+     :event/timestamp (:timestamp e)
+     :event/fn-name (str (:fn-name e))
+     :event/ns (str (:ns e))
+     :event/thread (:thread e)}
+    (when (:fn-caller e)
+      {:event/fn-caller [:event/id (:fn-caller e)]})
+    (when (seq (:args e))
+      {:event/fn-args (map (fn [pos val]
+                             {:fn-arg/position pos
+                              :fn-arg/value (pr-str val)})
+                           (range) (:args e))}))])
 
 (defn- return-id->call-id [id]
   (str "c" (subs id 1)))

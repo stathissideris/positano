@@ -76,9 +76,7 @@ exercised, and therefore it can be used as a test-coverage metric.
 
 ## Next steps/roadmap
 
-* Add caller information to function call events and link it via datomic refs
 * Function to trace/untrace whole codebase (consider including clojure.core)
-* Plug in-memory datomic to tracing
 * Explore tracing individual S-expressions
 * Utilities for deriving schemas and type annotations
 * Run clojure.core tests, derive type annotations and compare to
