@@ -1,7 +1,8 @@
 (ns positano.query
-  (:require [datomic.api :as d]
+  (:require [clojure.string :as str]
+            [datomic.api :as d]
             [positano.db :as db]
-            [clojure.string :as str]))
+            [positano.time :as time]))
 
 (defn fn-call? [e] (= :fn-call (:event/type e)))
 (defn fn-return? [e] (= :fn-return (:event/type e)))
@@ -41,10 +42,19 @@
 (defn- indent [x]
   (str/join (repeat x "  ")))
 
+(defn event-duration [e]
+  (time/difference
+   (:event/timestamp (fn-entry e))
+   (:event/timestamp (fn-return e))))
+
 (defn print-stack [s]
   (doseq [{:keys [entry i]} (map #(assoc %1 :i %2) (reverse s) (range))]
     (let [entry (db/deserialise entry)]
       (println (str (indent i) "(" (:event/fn-name entry) " " (args-str entry) ")"))))
   (doseq [{:keys [return i]} (map #(assoc %1 :i %2) s (range (count s) 0 -1))]
     (let [entry (db/deserialise return)]
-      (println (str (indent (dec i)) "=> " (:event/return-value entry))))))
+      (println (str (indent (dec i))
+                    "=> "
+                    (:event/return-value entry)
+                    " -- "
+                    (time/duration-string (event-duration return)))))))
