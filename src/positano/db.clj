@@ -1,5 +1,6 @@
-(ns positano.datomic
+(ns positano.db
   (:require [datomic.api :as d]
+            [clojure.edn :as edn]
             [clojure.core.async :as async :refer [<!! thread]]))
 
 (def db-uri-base "datomic:mem://")
@@ -131,6 +132,24 @@
       :event/fn-entry [:event/id call-event-id]}
      {:db/id [:event/id call-event-id]
       :event/fn-return #db/id[:db.part/user -1]}]))
+
+
+(defmulti deserialise :event/type)
+
+(defmethod deserialise :fn-call [e]
+  (assoc
+   (into {} e)
+   :event/fn-args
+   (->> e :event/fn-args
+        (sort-by :fn-arg/position)
+        (map (comp edn/read-string :fn-arg/value)))))
+
+(defmethod deserialise :fn-return [e]
+  (assoc
+   (into {} e)
+   :event/return-value
+   (-> e :event/return-value edn/read-string)))
+
 
 (defn event-channel
   [conn]

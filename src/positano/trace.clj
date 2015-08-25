@@ -1,8 +1,7 @@
-;;this is a "fork" of https://github.com/clojure/tools.trace/blob/master/src/main/clojure/clojure/tools/trace.clj
 (ns positano.trace
-  (:require [clojure.core.async :as async :refer [>!!]])
-  (:require [positano.datomic :as datomic])
-  (:use [clojure.pprint]))
+  (:require [clojure.core.async :as async :refer [>!!]]
+            [clojure.pprint :refer :all])
+  (:require [positano.db :as db]))
 
 (def event-channel (atom nil))
 
@@ -14,9 +13,9 @@
 (def ^{:doc "Forms to ignore when tracing forms." :private true}
       ignored-form? '#{def quote var try monitor-enter monitor-exit assert})
 
-(defn init-datomic []
-  (let [conn (datomic/memory-connection)]
-    (reset! event-channel (datomic/event-channel conn))
+(defn init-db []
+  (let [conn (db/memory-connection)]
+    (reset! event-channel (db/event-channel conn))
     conn))
 
 (defn ^{:private true} tracer

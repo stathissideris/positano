@@ -1,9 +1,13 @@
 (ns positano.core
-  (:require [positano.trace :as trace]
-            [datomic.api :as d]))
+  (:require [datomic.api :as d]
+            [positano.trace :as trace]
+            [positano.query :as q]))
+
+(trace/deftrace baz [x]
+  (inc x))
 
 (trace/deftrace bar [x]
-  (* x 3))
+  (* (baz x) 3))
 
 (trace/deftrace foo
   "I don't do a whole lot."
@@ -12,11 +16,16 @@
   (bar x))
 
 (comment
-  (def conn (trace/init-datomic))
+  (def conn (trace/init-db))
   (foo 10)
   (def r
     (let [db (d/db conn)
           res (d/q '[:find ?e :where [?e :event/type _]] db)]
+      (for [r res]
+        (d/touch (d/entity db (first r))))))
+  (def r
+    (let [db (d/db conn)
+          res (d/q '[:find ?e :where [?e :event/fn-name "baz"]] db)]
       (for [r res]
         (d/touch (d/entity db (first r))))))
 
