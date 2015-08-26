@@ -3,6 +3,8 @@
             [clojure.edn :as edn]
             [clojure.core.async :as async :refer [<!! thread]]))
 
+(def event-counter (atom 0))
+
 (def db-uri-base "datomic:mem://")
 
 (def schema
@@ -84,15 +86,19 @@
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}])
 
+(defn destroy-db! [uri]
+  (when (d/delete-database uri)
+    (reset! event-counter 0)))
+
 (defn memory-connection
   "Create a connection to an anonymous, in-memory database."
   []
   (let [uri (str db-uri-base (d/squuid))]
-    (d/delete-database uri)
+    (destroy-db! uri)
     (d/create-database uri)
     (let [conn (d/connect uri)]
       @(d/transact conn schema)
-      conn)))
+      uri)))
 
 (defmulti to-transactions :type)
 
@@ -152,16 +158,20 @@
 
 
 (defn event-channel
-  [conn]
-  (let [channel (async/chan)]
+  [uri]
+  (let [conn    (d/connect uri)
+        channel (async/chan 1024)]
     (thread
       (loop []
         (when-let [event (<!! channel)]
           (try
             @(d/transact conn (to-transactions event))
+            (swap! event-counter inc)
             (catch Exception e
               (println "ERROR" (.getMessage e))))
-          (recur))))
+          (recur)))
+      ;;TODO do we need to close the connection here?
+      )
     channel))
 
 (defn clear-db! [conn]

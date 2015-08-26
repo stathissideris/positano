@@ -47,6 +47,10 @@
    (:event/timestamp (fn-entry e))
    (:event/timestamp (fn-return e))))
 
+(defn all-function-events [db]
+  (for [r (d/q '[:find ?e :where [?e :event/type _]] db)]
+    (d/entity db (first r))))
+
 (defn print-stack [s]
   (doseq [{:keys [entry i]} (map #(assoc %1 :i %2) (reverse s) (range))]
     (let [entry (db/deserialise entry)]

@@ -1,7 +1,8 @@
 (ns positano.trace
   (:require [clojure.core.async :as async :refer [>!!]]
             [clojure.pprint :refer :all])
-  (:require [positano.db :as db]))
+  (:require [positano.db :as db]
+            [positano.utils :refer [in-recursive-stack?]]))
 
 (def event-channel (atom nil))
 
@@ -22,13 +23,15 @@
   (swap! recording? (constantly x)))
 
 (defn init-db! []
-  (let [conn (db/memory-connection)]
-    (reset! event-channel (db/event-channel conn))
+  (let [uri (db/memory-connection)]
+    (reset! event-channel (db/event-channel uri))
     (set-recording! true)
-    conn))
+    uri))
 
-(defn stop-db! []
-  (async/close! @event-channel))
+(defn stop-db! [uri]
+  (set-recording! false)
+  (async/close! @event-channel)
+  (db/destroy-db! uri))
 
 (defn clear-db! [conn]
   (db/clear-db! conn))
@@ -48,16 +51,12 @@ affecting the result."
      (tracer name (pr-str value))
      value))
 
-(defn ^{:private true} trace-indent
-  "Returns an indentation string based on *trace-depth*"
-  []
-  (apply str (take *trace-depth* (repeat "| "))))
-
 (defn record-event [e]
   ;;TODO check events using prismatic schema here
-  (if @event-channel
-    (>!! @event-channel e)
-    (println "ERROR - positano event channel not initialised"))) ;;TODO log this instead of printing
+  (when (and @recording? (not (in-recursive-stack?)))
+    (if @event-channel
+      (>!! @event-channel e)
+      (println "ERROR - positano event channel not initialised -- can't log" (pr-str e))))) ;;TODO log this instead of printing
 
 (defn base-trace []
   {:timestamp (java.util.Date.)})
@@ -85,26 +84,27 @@ symbol name of the function."
   [name ns f args]
   (let [id        (gensym "")
         thread-id (.getId (Thread/currentThread))]
-    (record-event (merge (base-trace)
-                         {:type :fn-call
-                          :id (str "c" id)
-                          :fn-name name
-                          :ns (.name ns)
-                          :thread thread-id
-                          :fn-caller (when-let [caller (current-caller thread-id)] (str "c" caller))
-                          :args args}))
+    (record-event
+     (merge (base-trace)
+            {:type :fn-call
+             :id (str "c" id)
+             :fn-name name
+             :ns (.name ns)
+             :thread thread-id
+             :fn-caller (when-let [caller (current-caller thread-id)] (str "c" caller))
+             :args args}))
     (maybe-init-thread-stack! thread-id)
     (push-id-to-stack! thread-id id)
-    (let [value (binding [*trace-depth* (inc *trace-depth*)]
-                  (apply f args))]
+    (let [value (apply f args)]
       (pop-stack! thread-id)
-      (record-event (merge (base-trace)
-                           {:type :fn-return
-                            :id (str "r" id)
-                            :fn-name name
-                            :ns (.name ns)
-                            :thread thread-id
-                            :return-value value}))
+      (record-event
+       (merge (base-trace)
+              {:type :fn-return
+               :id (str "r" id)
+               :fn-name name
+               :ns (.name ns)
+               :thread thread-id
+               :return-value value}))
       value)))
 
 (defmacro deftrace
@@ -328,7 +328,7 @@ symbol name of the function."
              vname (symbol (str ns "/" s))]
          (doto v
            (alter-var-root #(fn tracing-wrapper [& args]
-                              (trace-fn-call s *ns* % args)))
+                              (trace-fn-call s ns % args)))
            (alter-meta! assoc ::traced f)))))))
 
 (defn ^{:skip-wiki true} untrace-var*
@@ -364,6 +364,20 @@ symbol name of the function."
   [& vs]
  `(do ~@(for [x vs] `(untrace-var* (quote ~x)))))
 
+(defn- ns-starts-with? [ns prefix]
+  (.startsWith (-> ns .name str) prefix))
+
+(defn- skip-ns-tracing? [ns]
+  (or ('#{clojure.core clojure.core.protocols clojure.tools.trace} (.name ns))
+      (ns-starts-with? ns "clojure.core.async.")
+      (ns-starts-with? ns "refactor-nrepl.")
+      (ns-starts-with? ns "clojure.tools.nrepl")
+      (ns-starts-with? ns "clojure.repl")
+      (ns-starts-with? ns "cider.")
+      (and
+       (not= 'positano.core (-> ns .name))
+       (ns-starts-with? ns "positano."))))
+
 (defn ^{:skip-wiki true} trace-ns*
   "Replaces each function from the given namespace with a version wrapped
   in a tracing call. Can be undone with untrace-ns. ns should be a namespace
@@ -372,7 +386,8 @@ symbol name of the function."
   No-op for clojure.core, clojure.tools.trace and positano.trace."
   [ns]
   (let [ns (the-ns ns)]
-    (when-not ('#{clojure.core clojure.tools.trace positano.trace} (.name ns))
+    (when-not (skip-ns-tracing? ns)
+      (println "Tracing ns" (.name ns))
       (let [ns-fns (->> ns ns-interns vals (filter (comp fn? var-get)))]
         (doseq [f ns-fns]
           (trace-var* f))))))
@@ -396,12 +411,17 @@ symbol name of the function."
   [ns]
   `(untrace-ns* ~ns))
 
+(defn trace-all []
+  (set-recording! false)
+  (doseq [n (all-ns)] (trace-ns* n))
+  (set-recording! true))
+
 (defn traced?
   "Returns true if the given var is currently traced, false otherwise"
   [v]
   (let [^clojure.lang.Var v (if (var? v) v (resolve v))]
     (-> v meta ::traced nil? not)))
- 
+
 (defn traceable?
   "Returns true if the given var can be traced, false otherwise"
   [v]
