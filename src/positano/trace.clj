@@ -7,16 +7,31 @@
 
 (def stacks (atom {}))
 
+(def recording? (atom false))
+
 (def ^{:doc "Current stack depth of traced function calls." :private true :dynamic true}
       *trace-depth* 0)
 
 (def ^{:doc "Forms to ignore when tracing forms." :private true}
       ignored-form? '#{def quote var try monitor-enter monitor-exit assert})
 
-(defn init-db []
+(defn toggle-recording! []
+  (swap! recording? not))
+
+(defn set-recording! [x]
+  (swap! recording? (constantly x)))
+
+(defn init-db! []
   (let [conn (db/memory-connection)]
     (reset! event-channel (db/event-channel conn))
+    (set-recording! true)
     conn))
+
+(defn stop-db! []
+  (async/close! @event-channel))
+
+(defn clear-db! [conn]
+  (db/clear-db! conn))
 
 (defn ^{:private true} tracer
   "This function is called by trace. Prints to standard output, but
