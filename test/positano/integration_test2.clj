@@ -1,7 +1,9 @@
 (ns positano.integration-test2
   (:require [clojure.test :refer :all]
             [positano.trace :as trace]
+            [positano.db :as db]
             [positano.query :as q]
+            [positano.utils :refer [block-until]]
             [datomic.api :as d]))
 
 (trace/deftrace baz [x]
@@ -22,7 +24,7 @@
     (trace/trace-var* 'foo)
     (foo [5 10 20 40])
 
-    (Thread/sleep 10) ;;TODO really upset about this
+    (is (not= :timed-out (block-until #(= 6 @db/event-counter) 10 3000)))
 
     (let [db (d/db conn)
           events (q/all-function-events db)]
