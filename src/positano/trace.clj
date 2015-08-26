@@ -305,16 +305,16 @@ symbol name of the function."
   ([ns s]
      (trace-var* (ns-resolve ns s)))
   ([v]
-     (let [^clojure.lang.Var v (if (var? v) v (resolve v))
-           ns (.ns v)
-           s  (.sym v)]
-       (if (and (ifn? @v) (-> v meta :macro not) (-> v meta ::traced not))
-         (let [f @v
-               vname (symbol (str ns "/" s))]
-           (doto v
-             (alter-var-root #(fn tracing-wrapper [& args]
-                                (trace-fn-call vname *ns* % args)))
-             (alter-meta! assoc ::traced f)))))))
+   (let [^clojure.lang.Var v (if (var? v) v (resolve v))
+         ns (.ns v)
+         s  (.sym v)]
+     (if (and (ifn? @v) (-> v meta :macro not) (-> v meta ::traced not))
+       (let [f @v
+             vname (symbol (str ns "/" s))]
+         (doto v
+           (alter-var-root #(fn tracing-wrapper [& args]
+                              (trace-fn-call s *ns* % args)))
+           (alter-meta! assoc ::traced f)))))))
 
 (defn ^{:skip-wiki true} untrace-var*
   "Reverses the effect of trace-var / trace-vars / trace-ns for the
