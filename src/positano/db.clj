@@ -156,12 +156,17 @@
   (let [channel (async/chan)]
     (thread
       (loop []
-        (try
-          @(d/transact conn (to-transactions (<!! channel)))
-          (catch Exception e
-            (println "ERROR" (.getMessage e))))
-        (recur)))
+        (when-let [event (<!! channel)]
+          (try
+            @(d/transact conn (to-transactions event))
+            (catch Exception e
+              (println "ERROR" (.getMessage e))))
+          (recur))))
     channel))
+
+(defn clear-db! [conn]
+  ;;TODO
+  )
 
 (comment
   (def conn (memory-connection))
