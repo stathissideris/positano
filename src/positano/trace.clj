@@ -78,7 +78,7 @@ affecting the result."
 
 ;;
 
-(defn ^{:skip-wiki true} trace-fn-call
+(defn trace-fn-call
   "Traces a single call to a function f with args. 'name' is the
 symbol name of the function."
   [name ns f args]
@@ -281,7 +281,7 @@ symbol name of the function."
   ThrowableRecompose
   (ctor-select [this _ _] this)) ;; Obviously something is wrong but the trace should not alter processing
 
-(defn ^{:skip-wiki true} trace-compose-throwable 
+(defn trace-compose-throwable 
   "Re-create a new throwable with a composed message from the given throwable
    and the message to be added. The exception stack trace is kept at a minimum."
   [^Throwable throwable ^String message]
@@ -291,7 +291,7 @@ symbol name of the function."
         new-throwable (clone-throwable throwable new-stack-trace [composed-msg])]
     new-throwable))
 
-(defn ^{:skip-wiki true} trace-form
+(defn trace-form
   "Trace the given form avoiding try catch when recur is present in the form."
   [form]
   (if (recurs? form)
@@ -307,7 +307,7 @@ symbol name of the function."
   `(do
      ~@(map trace-form body)))
 
-(defn ^{:skip-wiki true} trace-var*
+(defn trace-var*
   "If the specified Var holds an IFn and is not marked as a macro, its
   contents is replaced with a version wrapped in a tracing call;
   otherwise nothing happens. Can be undone with untrace-var.
@@ -331,7 +331,7 @@ symbol name of the function."
                               (trace-fn-call s ns % args)))
            (alter-meta! assoc ::traced f)))))))
 
-(defn ^{:skip-wiki true} untrace-var*
+(defn untrace-var*
   "Reverses the effect of trace-var / trace-vars / trace-ns for the
   given Var, replacing the traced function with the original, untraced
   version. No-op for non-traced Vars.
@@ -378,7 +378,13 @@ symbol name of the function."
        (not= 'positano.core (-> ns .name))
        (ns-starts-with? ns "positano."))))
 
-(defn ^{:skip-wiki true} trace-ns*
+(defn- all-fn-vars
+  ([]
+   (mapcat all-fn-vars (all-ns)))
+  ([ns]
+   (->> ns ns-interns vals (filter (comp fn? var-get)))))
+
+(defn trace-ns*
   "Replaces each function from the given namespace with a version wrapped
   in a tracing call. Can be undone with untrace-ns. ns should be a namespace
   object or a symbol.
@@ -388,7 +394,7 @@ symbol name of the function."
   (let [ns (the-ns ns)]
     (when-not (skip-ns-tracing? ns)
       (println "Tracing ns" (.name ns))
-      (let [ns-fns (->> ns ns-interns vals (filter (comp fn? var-get)))]
+      (let [ns-fns (all-fn-vars ns)]
         (doseq [f ns-fns]
           (trace-var* f))))))
 
@@ -397,7 +403,7 @@ symbol name of the function."
   [ns]
   `(trace-ns* ~ns)) 
 
-(defn ^{:skip-wiki true} untrace-ns*
+(defn untrace-ns*
   "Reverses the effect of trace-var / trace-vars / trace-ns for the
   Vars in the given namespace, replacing each traced function from the
   given namespace with the original, untraced version."
@@ -411,7 +417,11 @@ symbol name of the function."
   [ns]
   `(untrace-ns* ~ns))
 
-(defn trace-all []
+(defn trace-all
+  "Traces all vars in all namespaces with a few exceptions (see
+  private function skip-ns-tracing?). WARNING: This is risky and most
+  likely to destabilise your application, generally a bad idea."
+  []
   (set-recording! false)
   (doseq [n (all-ns)] (trace-ns* n))
   (set-recording! true))
