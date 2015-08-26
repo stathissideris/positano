@@ -74,7 +74,7 @@ symbol name of the function."
                          {:type :fn-call
                           :id (str "c" id)
                           :fn-name name
-                          :ns ns
+                          :ns (.name ns)
                           :thread thread-id
                           :fn-caller (when-let [caller (current-caller thread-id)] (str "c" caller))
                           :args args}))
@@ -87,7 +87,7 @@ symbol name of the function."
                            {:type :fn-return
                             :id (str "r" id)
                             :fn-name name
-                            :ns ns
+                            :ns (.name ns)
                             :thread thread-id
                             :return-value value}))
       value)))
