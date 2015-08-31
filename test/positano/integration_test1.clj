@@ -6,21 +6,35 @@
             [positano.utils :refer [block-until]]
             [datomic.api :as d]))
 
-(trace/deftrace baz [x]
-  (inc x))
+(defn setup []
+  (trace/deftrace baz [x]
+    (inc x))
 
-(trace/deftrace bar [x]
-  (* (baz (/ x 2.0)) 3))
+  (trace/deftrace bar [x]
+    (* (baz (/ x 2.0)) 3))
 
-(trace/deftrace foo
-  "I don't do a whole lot."
-  [x]
-  (println "Hello World!")
-  (bar (first x)))
+  (trace/deftrace foo
+    "I don't do a whole lot."
+    [x]
+    (println "Hello World!")
+    (bar (first x))))
+
+(defn tear-down [uri]
+  (trace/stop-db! uri)
+  (trace/untrace-all))
 
 (deftest simple-tracing
   (let [uri  (trace/init-db!)
         conn (d/connect uri)]
+
+    (setup)
+
+    (let [traced (set (map str (filter trace/traced? (trace/all-fn-vars))))]
+      (is (= 3 (count traced)))
+      (is (= #{"#'positano.integration-test1/baz"
+               "#'positano.integration-test1/bar"
+               "#'positano.integration-test1/foo"} traced)))
+    
     (foo [5 10 20 40])
     
     (is (not= :timed-out (block-until #(= 6 @db/event-counter) 10 3000)))
@@ -57,4 +71,4 @@
                     (into {}))))
 
         (def events (map d/touch events))))
-    (trace/stop-db! uri)))
+    (tear-down uri)))

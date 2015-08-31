@@ -7,22 +7,39 @@
             [positano.utils :refer [block-until]]
             [datomic.api :as d]))
 
-(trace/deftrace baz [x]
-  (inc x))
+(defn setup []
+  (trace/untrace-all)
+  
+  (trace/deftrace baz [x]
+    (inc x))
 
-(trace/deftrace bar [x]
-  (* (baz (/ x 2.0)) 3))
+  (trace/deftrace bar [x]
+    (* (baz (/ x 2.0)) 3))
 
-(trace/deftrace foo
-  "I don't do a whole lot."
-  [x]
-  (println (string/join "," ["Hello" "World!"]))
-  (bar (first x)))
+  (trace/deftrace foo
+    "I don't do a whole lot."
+    [x]
+    (println (string/join ", " ["Hello" "World!"]))
+    (bar (first x)))
+
+  (trace/trace-var* 'clojure.string 'join))
+
+(defn tear-down [uri]
+  (trace/stop-db! uri)
+  (trace/untrace-all))
 
 (deftest simple-tracing
   (let [uri  (trace/init-db!)
         conn (d/connect uri)]
-    (trace/trace-var* 'clojure.string 'join)
+
+    (setup)
+
+    (let [traced (set (map str (filter trace/traced? (trace/all-fn-vars))))]
+      (is (= 4 (count traced)))
+      (is (= #{"#'positano.integration-test3/baz"
+               "#'positano.integration-test3/bar"
+               "#'positano.integration-test3/foo"
+               "#'clojure.string/join"} traced)))
     
     (foo [5 10 20 40])
     
@@ -45,7 +62,7 @@
         (is (= {"foo" [[5 10 20 40]]
                 "bar" [5]
                 "baz" [2.5]
-                "join" ["," ["Hello" "World!"]]}
+                "join" [", " ["Hello" "World!"]]}
                (->> events
                     (filter q/fn-call?)
                     (map db/deserialise)
@@ -56,7 +73,7 @@
         (is (= {"baz" 3.5
                 "bar" 10.5
                 "foo" 10.5
-                "join" "Hello,World!"}
+                "join" "Hello, World!"}
                (->> events
                     (filter q/fn-return?)
                     (map db/deserialise)
@@ -64,4 +81,4 @@
                     (into {}))))
 
         (def events (map d/touch events))))
-    (trace/stop-db! uri)))
+    (tear-down uri)))

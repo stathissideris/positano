@@ -8,28 +8,25 @@
 
 (def stacks (atom {}))
 
-(def recording? (atom false))
+(def ^:dynamic recording? true)
 
-(def ^{:doc "Current stack depth of traced function calls." :private true :dynamic true}
-      *trace-depth* 0)
+(defmacro without-recording [& body]
+  `(binding [recording? false]
+     ~@body))
+
+(defmacro with-recording [& body]
+  `(binding [recording? true]
+     ~@body))
 
 (def ^{:doc "Forms to ignore when tracing forms." :private true}
       ignored-form? '#{def quote var try monitor-enter monitor-exit assert})
 
-(defn toggle-recording! []
-  (swap! recording? not))
-
-(defn set-recording! [x]
-  (swap! recording? (constantly x)))
-
 (defn init-db! []
   (let [uri (db/memory-connection)]
     (reset! event-channel (db/event-channel uri))
-    (set-recording! true)
     uri))
 
 (defn stop-db! [uri]
-  (set-recording! false)
   (async/close! @event-channel)
   (db/destroy-db! uri))
 
@@ -53,10 +50,11 @@ affecting the result."
 
 (defn record-event [e]
   ;;TODO check events using prismatic schema here
-  (when (and @recording? (not (in-recursive-stack?)))
-    (if @event-channel
-      (>!! @event-channel e)
-      (println "ERROR - positano event channel not initialised -- can't log" (pr-str e))))) ;;TODO log this instead of printing
+  (when recording?
+    (without-recording
+     (if @event-channel
+       (>!! @event-channel e)
+       (println "ERROR - positano event channel not initialised -- can't log" (pr-str e)))))) ;;TODO log this instead of printing
 
 (defn base-trace []
   {:timestamp (java.util.Date.)})
@@ -80,32 +78,33 @@ affecting the result."
 
 (defn trace-fn-call
   "Traces a single call to a function f with args. 'name' is the
-symbol name of the function."
+  symbol name of the function."
   [name ns f args]
-  (let [id        (gensym "")
-        thread-id (.getId (Thread/currentThread))]
-    (record-event
-     (merge (base-trace)
-            {:type :fn-call
-             :id (str "c" id)
-             :fn-name name
-             :ns (.name ns)
-             :thread thread-id
-             :fn-caller (when-let [caller (current-caller thread-id)] (str "c" caller))
-             :args args}))
-    (maybe-init-thread-stack! thread-id)
-    (push-id-to-stack! thread-id id)
-    (let [value (apply f args)]
-      (pop-stack! thread-id)
-      (record-event
-       (merge (base-trace)
-              {:type :fn-return
-               :id (str "r" id)
-               :fn-name name
-               :ns (.name ns)
-               :thread thread-id
-               :return-value value}))
-      value)))
+  (without-recording
+   (let [id        (gensym "")
+         thread-id (.getId (Thread/currentThread))
+         event     (merge (base-trace)
+                          {:type :fn-call
+                           :id (str "c" id)
+                           :fn-name name
+                           :ns (.name ns)
+                           :thread thread-id
+                           :fn-caller (when-let [caller (current-caller thread-id)] (str "c" caller))
+                           :args args})]
+     (with-recording (record-event event))
+     (maybe-init-thread-stack! thread-id)
+     (push-id-to-stack! thread-id id)
+     (let [value (with-recording (apply f args))
+           event (merge (base-trace)
+                        {:type :fn-return
+                         :id (str "r" id)
+                         :fn-name name
+                         :ns (.name ns)
+                         :thread thread-id
+                         :return-value value})]
+       (pop-stack! thread-id)
+       (with-recording (record-event event))
+       value))))
 
 (defmacro deftrace
   "Use in place of defn; traces each call/return of this fn, including
@@ -119,7 +118,8 @@ symbol name of the function."
        (declare ~name)
        (let [f# (fn ~@fn-form)]
          (defn ~name ~doc-string [& args#]
-           (trace-fn-call '~name *ns* f# args#))))))
+           (trace-fn-call '~name *ns* f# args#))
+         (alter-meta! (resolve '~name) assoc ::traced f#)))))
 
 (declare trace-form)
 (defmulti trace-special-form (fn [form] (first form)))
@@ -349,6 +349,23 @@ symbol name of the function."
            (alter-var-root (constantly ((meta v) ::traced)))
            (alter-meta! dissoc ::traced))))))
 
+(defn traced?
+  "Returns true if the given var is currently traced, false otherwise"
+  [v]
+  (let [^clojure.lang.Var v (if (var? v) v (resolve v))]
+    (-> v meta ::traced nil? not)))
+
+(defn all-fn-vars
+  ([]
+   (mapcat all-fn-vars (all-ns)))
+  ([ns]
+   (->> ns ns-interns vals (filter (comp fn? var-get)))))
+
+(defn untrace-all
+  []
+  (doseq [v (filter traced? (all-fn-vars))]
+    (untrace-var* v)))
+
 (defmacro trace-vars
   "Trace each of the specified Vars.
   The arguments may be Var objects or symbols to be resolved in the current
@@ -377,12 +394,6 @@ symbol name of the function."
       (and
        (not= 'positano.core (-> ns .name))
        (ns-starts-with? ns "positano."))))
-
-(defn- all-fn-vars
-  ([]
-   (mapcat all-fn-vars (all-ns)))
-  ([ns]
-   (->> ns ns-interns vals (filter (comp fn? var-get)))))
 
 (defn trace-ns*
   "Replaces each function from the given namespace with a version wrapped
@@ -422,15 +433,8 @@ symbol name of the function."
   private function skip-ns-tracing?). WARNING: This is risky and most
   likely to destabilise your application, generally a bad idea."
   []
-  (set-recording! false)
-  (doseq [n (all-ns)] (trace-ns* n))
-  (set-recording! true))
-
-(defn traced?
-  "Returns true if the given var is currently traced, false otherwise"
-  [v]
-  (let [^clojure.lang.Var v (if (var? v) v (resolve v))]
-    (-> v meta ::traced nil? not)))
+  (without-recording
+   (doseq [n (all-ns)] (trace-ns* n))))
 
 (defn traceable?
   "Returns true if the given var can be traced, false otherwise"

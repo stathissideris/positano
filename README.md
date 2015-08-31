@@ -76,6 +76,7 @@ exercised, and therefore it can be used as a test-coverage metric.
 
 ## Next steps/roadmap
 
+* Handle case where function hasn't returned yet and the db is being queried
 * Guard against record-event chain reactions blowing the stack
 * Function to trace/untrace whole codebase (consider including clojure.core)
 * Explore tracing individual S-expressions
