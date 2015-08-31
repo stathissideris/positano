@@ -370,7 +370,7 @@ affecting the result."
   "Trace each of the specified Vars.
   The arguments may be Var objects or symbols to be resolved in the current
   namespace."
-  [& vs]
+  [vs]
   `(do ~@(for [x vs] `(trace-var* (quote ~x)))))
 
 (defmacro untrace-vars
@@ -442,3 +442,14 @@ affecting the result."
   (let [^clojure.lang.Var v (if (var? v) v (resolve v))]
     (and (ifn? @v) (-> v meta :macro not))))
 
+(defn var-ns-name [v]
+  (-> v .ns .name str))
+
+(defn var-full-name [v]
+  (str v))
+
+(defn ns-prefix? [v prefix]
+  (.startsWith (var-ns-name v) prefix))
+
+(defn full-name-prefix? [v prefix]
+  (.startsWith (str v) prefix))

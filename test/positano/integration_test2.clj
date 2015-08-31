@@ -6,6 +6,8 @@
             [positano.utils :refer [block-until]]
             [datomic.api :as d]))
 
+;;test simple tracing with mixture of deftrace and trace-var*
+
 (defn setup []
   (trace/untrace-all)
   

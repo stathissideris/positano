@@ -6,6 +6,8 @@
             [positano.utils :refer [block-until]]
             [datomic.api :as d]))
 
+;;test simple tracing
+
 (defn setup []
   (trace/deftrace baz [x]
     (inc x))
