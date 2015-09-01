@@ -65,6 +65,46 @@ Running a collection of unit tests against a codebase along with a
 provenance tool can reveal which parts of the codebase are not
 exercised, and therefore it can be used as a test-coverage metric.
 
+## Usage
+
+### How to
+
+This section assumes the following:
+
+```clojure
+(require '[positano.trace :as trace])
+```
+
+Find out how many vars are being traced:
+
+```clojure
+(->> (trace/all-fn-vars) (filter trace/traced?) count)
+```
+
+Print out all the vars being traced:
+
+```clojure
+(->> (trace/all-fn-vars)
+     (filter trace/traced?)
+     (map str)
+     clojure.pprint/pprint)
+```
+
+Trace vars that belong to a namespace with a specific prefix:
+
+```clojure
+(->> (trace/all-fn-vars)
+     (filter #(trace/ns-prefix? % "my-project.my-ns."))
+     (map trace/trace-var*)
+     (doall))
+```
+
+Untrace everything:
+
+```clojure
+(trace/untrace-all)
+```
+
 ## Architecture
 
 * Total code tracing
@@ -73,6 +113,26 @@ exercised, and therefore it can be used as a test-coverage metric.
   narrative.
 * Utility code for extracting Prismatic schemas and Typed Clojure
   types from execution information.
+
+## Limitations
+
+positano will refuse to add tracing to certain namespaces when you use
+the `trace-ns*` function (it will add tracing when you use the
+`trace-var*` function on vars belonging to those namespaces, so do
+that at your own risk):
+
+* clojure.core
+* clojure.core.protocols
+* clojure.tools.trace
+* datomic.*
+* clojure.tools.analyzer.*
+* clojure.core.async.*
+* refactor-nrepl.*
+* clojure.tools.nrepl.*
+* clojure.repl.*
+* cider.*
+* deps.*
+* positano.*
 
 ## Next steps/roadmap
 
