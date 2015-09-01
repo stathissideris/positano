@@ -1,20 +1,27 @@
 (ns positano.core
   (:require [datomic.api :as d]
+            [clojure.core.async :as async :refer [>!!]]
             [positano.trace :as trace]
+            [positano.db :as db]
             [positano.query :as q]
+            [clojure.walk :as walk]
             [clojure.string :as string]))
 
-(trace/deftrace baz [x]
-  (inc x))
+(defn init-db! []
+  (let [uri (db/memory-connection)]
+    (reset! trace/event-channel (db/event-channel uri))
+    uri))
 
-(trace/deftrace bar [x]
-  (* (baz (/ x 2.0)) 3))
+(defn stop-db! [uri]
+  (async/close! @trace/event-channel)
+  (db/destroy-db! uri))
 
-(defn foo
-  "I don't do a whole lot."
-  [x]
-  (println (string/join "," ["Hello" " World!"]))
-  (bar (first x)))
+(defn clear-db! [conn]
+  (db/clear-db! conn))
+
+
+(comment
+  (def uri (init-db!)))
 
 (comment
   (def uri (trace/init-db!))

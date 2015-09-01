@@ -1,7 +1,8 @@
 (ns positano.db
   (:require [datomic.api :as d]
             [clojure.edn :as edn]
-            [clojure.core.async :as async :refer [<!! thread]]))
+            [clojure.core.async :as async :refer [<!! thread]]
+            [positano.trace :as trace]))
 
 (def event-counter (atom 0))
 
@@ -162,14 +163,15 @@
   (let [conn    (d/connect uri)
         channel (async/chan 1024)]
     (thread
-      (loop []
-        (when-let [event (<!! channel)]
-          (try
-            @(d/transact conn (to-transactions event))
-            (swap! event-counter inc)
-            (catch Exception e
-              (println "ERROR" (.getMessage e))))
-          (recur)))
+      (trace/without-recording ;;dynamic binding is thread-local so we need to say this once more here
+       (loop []
+         (when-let [event (<!! channel)]
+           (try
+             @(d/transact conn (to-transactions event))
+             (swap! event-counter inc)
+             (catch Exception e
+               (println "ERROR" (.getMessage e))))
+           (recur))))
       ;;TODO do we need to close the connection here?
       )
     channel))

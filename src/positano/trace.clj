@@ -1,8 +1,7 @@
 (ns positano.trace
   (:require [clojure.core.async :as async :refer [>!!]]
             [clojure.pprint :refer :all])
-  (:require [positano.db :as db]
-            [positano.utils :refer [in-recursive-stack?]]))
+  (:require [positano.utils :refer [in-recursive-stack?]]))
 
 (def event-channel (atom nil))
 
@@ -20,18 +19,6 @@
 
 (def ^{:doc "Forms to ignore when tracing forms." :private true}
       ignored-form? '#{def quote var try monitor-enter monitor-exit assert})
-
-(defn init-db! []
-  (let [uri (db/memory-connection)]
-    (reset! event-channel (db/event-channel uri))
-    uri))
-
-(defn stop-db! [uri]
-  (async/close! @event-channel)
-  (db/destroy-db! uri))
-
-(defn clear-db! [conn]
-  (db/clear-db! conn))
 
 (defn ^{:private true} tracer
   "This function is called by trace. Prints to standard output, but
@@ -52,9 +39,8 @@ affecting the result."
   ;;TODO check events using prismatic schema here
   (when recording?
     (without-recording
-     (if @event-channel
-       (>!! @event-channel e)
-       (println "ERROR - positano event channel not initialised -- can't log" (pr-str e)))))) ;;TODO log this instead of printing
+     (when (and @event-channel (not (in-recursive-stack?)))
+       (>!! @event-channel e)))))
 
 (defn base-trace []
   {:timestamp (java.util.Date.)})
@@ -363,8 +349,9 @@ affecting the result."
 
 (defn untrace-all
   []
-  (doseq [v (filter traced? (all-fn-vars))]
-    (untrace-var* v)))
+  (without-recording
+   (doseq [v (filter traced? (all-fn-vars))]
+     (untrace-var* v))))
 
 (defmacro trace-vars
   "Trace each of the specified Vars.
@@ -386,14 +373,15 @@ affecting the result."
 
 (defn- skip-ns-tracing? [ns]
   (or ('#{clojure.core clojure.core.protocols clojure.tools.trace} (.name ns))
+      (ns-starts-with? ns "datomic")
+      (ns-starts-with? ns "clojure.tools.analyzer")
       (ns-starts-with? ns "clojure.core.async.")
       (ns-starts-with? ns "refactor-nrepl.")
       (ns-starts-with? ns "clojure.tools.nrepl")
       (ns-starts-with? ns "clojure.repl")
       (ns-starts-with? ns "cider.")
-      (and
-       (not= 'positano.core (-> ns .name))
-       (ns-starts-with? ns "positano."))))
+      (ns-starts-with? ns "deps.")
+      (ns-starts-with? ns "positano.")))
 
 (defn trace-ns*
   "Replaces each function from the given namespace with a version wrapped

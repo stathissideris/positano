@@ -4,6 +4,7 @@
             [positano.db :as db]
             [positano.query :as q]
             [positano.utils :refer [block-until]]
+            [positano.core :refer :all]
             [datomic.api :as d]))
 
 ;;test simple tracing
@@ -22,11 +23,11 @@
     (bar (first x))))
 
 (defn tear-down [uri]
-  (trace/stop-db! uri)
+  (stop-db! uri)
   (trace/untrace-all))
 
 (deftest simple-tracing
-  (let [uri  (trace/init-db!)
+  (let [uri  (init-db!)
         conn (d/connect uri)]
 
     (setup)
