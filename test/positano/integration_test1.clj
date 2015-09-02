@@ -10,6 +10,8 @@
 ;;test simple tracing
 
 (defn setup []
+  (trace/untrace-all)
+  
   (trace/deftrace baz [x]
     (inc x))
 
