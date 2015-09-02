@@ -9,29 +9,27 @@
    (fn [x] (if-not (map? x) x
                    (select-keys x ks))) m))
 
-(comment
-  (def kkk 999)
+(defn arg-lists
+  "fun should be a symbol that resolves to a function. Does not work
+  if you load a file with cider-load-buffer (C-c C-k)"
+  [fun]
+  (let [var (resolve fun)]
+    (cond
+      (nil? var)
+      (throw (ex-info (str "Cannot resolve " fun) {}))
+      
+      (not (fn? (var-get var)))
+      (throw (ex-info (str "Value of " var " is not a function") {}))
 
-  (defn aa
-    ([x y [a b]] 0)
-    ([x y z [a b]] 0))
-
-  (def bb (fn [x y [a b]] 0))
-
-  (def cc
-    (fn
-      ([x y [a b]] 0)
-      ([x y z [a b]] 0))))
-
-(defn arg-lists [fun]
-  (or (some-> fun resolve meta :arglists)
-      (let [source (some-> fun source-fn read-string)]
-        (when (and (= 'def (first source))
-                   (= 'fn (ffirst (drop 2 source))))
-          (let [method-form (first (drop 2 source))]
-            (if (vector? (second method-form))
-              (list (second method-form))
-              (map first (rest method-form))))))))
+      :else
+      (or (some-> var meta :arglists)
+          (let [source (some-> fun source-fn read-string)]
+            (when (and (= 'def (first source))
+                       (= 'fn (ffirst (drop 2 source))))
+              (let [method-form (first (drop 2 source))]
+                (if (vector? (second method-form))
+                  (list (second method-form))
+                  (map first (rest method-form))))))))))
 
 (defn- flatten-with-maps
   [x]
@@ -46,17 +44,27 @@
   `(fn ~'param-extractor-fn
      ~@(for [arg-list arg-lists]
          (let [args (arg-names arg-list)]
-           `(~arg-list ~(zipmap
-                         (map (fn [a] `(quote ~a)) args)
-                         args)))))) 
+           `(~arg-list ~(vec (map vector
+                                  (map (fn [a] `(quote ~a)) args)
+                                  args))))))) 
 
 (def make-param-extractor-fn
   (memoize
    (fn [arg-lists]
      (eval (param-extractor-fn-form arg-lists)))))
 
-(defn apply-arg-lists [arg-lists params]
+(defn bind-arg-lists [arg-lists params]
   (apply (make-param-extractor-fn arg-lists) params))
+
+(defn bind-params
+  "Answers the question: if I gave you a function and some parameters,
+  how would those parameters be bound to the arguments? fun should be
+  a symbol that resolves to a function. Returns a vector of pairs,
+  each containing the name of the argument (as a symbol) and the bound
+  value. The order of this vector is derived by flattening the
+  arg-lists."
+  [fun params]
+  (bind-arg-lists (arg-lists fun) params))
 
 (comment
   
