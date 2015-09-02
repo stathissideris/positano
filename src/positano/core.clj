@@ -1,7 +1,7 @@
 (ns positano.core
   (:require [datomic.api :as d]
             [clojure.core.async :as async :refer [>!!]]
-            [positano.trace :as trace]
+            [positano.trace :as trace :refer [deftrace]]
             [positano.db :as db]
             [positano.query :as q]
             [clojure.string :as string]))
@@ -23,9 +23,20 @@
   (def uri (init-db!)))
 
 (comment
-  (def uri (trace/init-db!))
-  (def conn (d/connect db))
-  (foo [5 10 20 40])
+  (do
+    (deftrace baz [x]
+      (+ x 10))
+    
+    (deftrace bar [x]
+      (baz (* 2 x)))
+    
+    (deftrace foo [b x c d]
+      (bar (inc x)))
+    
+    (def uri (init-db!))
+    (def conn (d/connect uri)))
+  
+  (foo 5 10 20 40)
 
   (def r
     (let [db (d/db conn)
@@ -35,15 +46,13 @@
 
   (-> r first q/stack q/print-stack)
 
-  (db/destroy-db! uri)
-  
-  ;;prints:
+  (db/destroy-db! uri))
 
-  ;; (foo [5 10 20 40])
-  ;;   (bar 5)
-  ;;     (baz 2.5)
-  ;;     => 3.5 -- 0msec
-  ;;   => 10.5 -- 4msec
-  ;; => 10.5 -- 6msec  
+;;prints:
 
-  )
+;;  (foo 5 10 20 40) b=5 x=10 c=20 d=40
+;;  ⃓ (bar 11) x=11
+;;  ⃓ ⃓ (baz 22) x=22
+;;  ⃓ ⃓ └─ 32 ⌚:1msec
+;;  ⃓ └─ 32 ⌚:1msec
+;;  └─ 32 ⌚:2msec
