@@ -32,15 +32,24 @@
                   (map first (rest method-form))))))))))
 
 (defn- flatten-with-maps
+  "Like the core flatten, but it goes into maps."
   [x]
   (filter (complement coll?)
           (rest (tree-seq coll? seq x))))
 
-(defn arg-names [arg-list]
+(defn arg-names
+  "Extract the names of the arguments from a passed arg-list in
+  \"flatten\" order."
+  [arg-list]
   (filter #(and (symbol? %)
                 (not= % '&)) (flatten-with-maps arg-list)))
 
-(defn param-extractor-fn-form [arg-lists]
+(defn param-extractor-fn-form
+  "Creates the form of a function that has the passed arg-lists (and
+  potentially multiple arities). For each arity, the function returns
+  a vector containing pairs of argument names (as symbols) to the
+  actual bound value of each argument."
+  [arg-lists]
   `(fn ~'param-extractor-fn
      ~@(for [arg-list arg-lists]
          (let [args (arg-names arg-list)]
