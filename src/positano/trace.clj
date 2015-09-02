@@ -94,18 +94,11 @@ affecting the result."
 
 (defmacro deftrace
   "Use in place of defn; traces each call/return of this fn, including
-   arguments. Nested calls to deftrace'd functions will print a
-   tree-like structure.
-   The first argument of the form definition can be a doc string"
+   arguments."
   [name & definition]
-  (let [doc-string (if (string? (first definition)) (first definition) "")
-        fn-form  (if (string? (first definition)) (rest definition) definition)]
-    `(do
-       (declare ~name)
-       (let [f# (fn ~@fn-form)]
-         (defn ~name ~doc-string [& args#]
-           (trace-fn-call '~name *ns* f# args#))
-         (alter-meta! (resolve '~name) assoc ::traced f#)))))
+  `(do
+     (defn ~@(cons name definition))
+     (trace-var* (resolve '~name))))
 
 (declare trace-form)
 (defmulti trace-special-form (fn [form] (first form)))
