@@ -39,8 +39,6 @@
 (defn- args-str [e]
   (str/join " " (map pr-str (:event/fn-args e))))
 
-(defn- indent [x]
-  (str/join (repeat x "  ")))
 
 (defn event-duration [e]
   (time/difference
@@ -51,16 +49,19 @@
   (for [r (d/q '[:find ?e :where [?e :event/type _]] db)]
     (d/entity db (first r))))
 
+(defn- indent [x]
+  (str/join (repeat x "⃓ ")))
+
 (defn print-stack [s]
   (doseq [{:keys [entry i]} (map #(assoc %1 :i %2) (reverse s) (range))]
     (let [entry (db/deserialise entry)]
       (println (str (indent i) "(" (:event/fn-name entry) " " (args-str entry) ")"))))
   (doseq [{:keys [return i]} (map #(assoc %1 :i %2) s (range (count s) 0 -1))]
     (if-not return
-      (println (str (indent (dec i)) "=> <pending>"))
+      (println (str (indent (dec i)) "└─ <pending>"))
       (let [entry (db/deserialise return)]
         (println (str (indent (dec i))
-                      "=> "
+                      "└─ "
                       (:event/return-value entry)
-                      " -- "
+                      " ⌚:"
                       (time/duration-string (event-duration return))))))))
