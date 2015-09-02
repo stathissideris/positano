@@ -4,7 +4,6 @@
             [positano.trace :as trace]
             [positano.db :as db]
             [positano.query :as q]
-            [clojure.walk :as walk]
             [clojure.string :as string]))
 
 (defn init-db! []
