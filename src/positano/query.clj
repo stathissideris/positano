@@ -66,10 +66,10 @@
       (println (str (indent i) "(" (:event/fn-name entry) " " (args-str entry) ") " (arg-bindings entry)))))
   (doseq [{:keys [return i]} (map #(assoc %1 :i %2) s (range (count s) 0 -1))]
     (if-not return
-      (println (str (indent (dec i)) "└─ <pending>"))
+      (println (str (indent (dec i)) "└ <pending>"))
       (let [entry (db/deserialise return)]
         (println (str (indent (dec i))
-                      "└─ "
+                      "└ "
                       (:event/return-value entry)
                       " ⌚:"
                       (time/duration-string (event-duration return))))))))
