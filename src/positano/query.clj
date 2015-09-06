@@ -68,8 +68,9 @@
     (if-not return
       (println (str (indent (dec i)) "└ <pending>"))
       (let [entry (db/deserialise return)]
-        (println (str (indent (dec i))
-                      "└ "
-                      (:event/return-value entry)
-                      " ⌚:"
-                      (time/duration-string (event-duration return))))))))
+        (println
+         (str (indent (dec i))
+              "└ "
+              (:event/return-value entry)
+              " ⌚:"
+              (time/duration-string (event-duration return))))))))

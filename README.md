@@ -136,7 +136,7 @@ that at your own risk):
 
 ## Next steps/roadmap
 
-* Handle case where function hasn't returned yet and the db is being queried
+* Start collecting function facts in datomic (such as arg-lists)
 * Guard against record-event chain reactions blowing the stack
 * Function to trace/untrace whole codebase (consider including clojure.core)
 * Explore tracing individual S-expressions
