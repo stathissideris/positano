@@ -149,7 +149,9 @@
    :event/fn-args
    (->> e :event/fn-args
         (sort-by :fn-arg/position)
-        (map (comp edn/read-string :fn-arg/value)))))
+        (map (comp (fn [s]
+                     (edn/read-string {:default (fn [_ x] x)} s))
+                   :fn-arg/value)))))
 
 (defmethod deserialise :fn-return [e]
   (assoc
