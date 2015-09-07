@@ -123,7 +123,7 @@
       {:event/fn-args (map (fn [pos val]
                              {:fn-arg/position pos
                               :fn-arg/value (edn-str val)})
-                           (range) (:args e))}))])
+                           (range) (:fn-args e))}))])
 
 (defn- return-id->call-id [id]
   (str "c" (subs id 1)))
