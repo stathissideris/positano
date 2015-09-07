@@ -6,10 +6,16 @@
             [positano.query :as q]
             [clojure.string :as string]))
 
-(defn init-db! []
-  (let [uri (db/memory-connection)]
-    (reset! trace/event-channel (db/event-channel uri))
-    uri))
+(defn init-db!
+  ([]
+   (init-db! {}))
+  ([{:keys [event-transformer] :as opts}]
+   (let [uri (db/memory-connection)]
+     (reset! trace/event-channel
+             (if event-transformer
+               (db/event-channel uri event-transformer)
+               (db/event-channel uri)))
+     uri)))
 
 (defn stop-db! [uri]
   (async/close! @trace/event-channel)

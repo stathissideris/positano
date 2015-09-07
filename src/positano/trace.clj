@@ -76,7 +76,7 @@ affecting the result."
                            :ns (.name ns)
                            :thread thread-id
                            :fn-caller (when-let [caller (current-caller thread-id)] (str "c" caller))
-                           :args args})]
+                           :args (into [] args)})]
      (with-recording (record-event event))
      (maybe-init-thread-stack! thread-id)
      (push-id-to-stack! thread-id id)
