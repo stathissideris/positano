@@ -101,6 +101,10 @@
       @(d/transact conn schema)
       uri)))
 
+(defn- edn-str [x]
+  (binding [*print-dup* true]
+    (pr-str x *out*)))
+
 (defmulti to-transactions :type)
 
 (defmethod to-transactions :fn-call
@@ -118,7 +122,7 @@
     (when (seq (:args e))
       {:event/fn-args (map (fn [pos val]
                              {:fn-arg/position pos
-                              :fn-arg/value (pr-str val)})
+                              :fn-arg/value (edn-str val)})
                            (range) (:args e))}))])
 
 (defn- return-id->call-id [id]
@@ -135,7 +139,7 @@
       :event/fn-name (str (:fn-name e))
       :event/ns (str (:ns e))
       :event/thread (:thread e)
-      :event/return-value (pr-str (:return-value e))
+      :event/return-value (edn-str (:return-value e))
       :event/fn-entry [:event/id call-event-id]}
      {:db/id [:event/id call-event-id]
       :event/fn-return #db/id[:db.part/user -1]}]))
@@ -143,21 +147,25 @@
 
 (defmulti deserialise :event/type)
 
+(defn- read-edn-string [s]
+  (try
+    (edn/read-string {:default (fn [_ x] x)} s)
+    (catch Exception e
+      (throw (ex-info "Cannot read EDN string" {:string s} e)))))
+
 (defmethod deserialise :fn-call [e]
   (assoc
    (into {} e)
    :event/fn-args
    (->> e :event/fn-args
         (sort-by :fn-arg/position)
-        (map (comp (fn [s]
-                     (edn/read-string {:default (fn [_ x] x)} s))
-                   :fn-arg/value)))))
+        (map (comp read-edn-string :fn-arg/value)))))
 
 (defmethod deserialise :fn-return [e]
   (assoc
    (into {} e)
    :event/return-value
-   (-> e :event/return-value edn/read-string)))
+   (-> e :event/return-value read-edn-string)))
 
 
 (defn event-channel
