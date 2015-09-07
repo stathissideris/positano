@@ -298,8 +298,10 @@ affecting the result."
   naming a namespace and s a symbol to be resolved in that namespace."
   ([ns s]
      (trace-var* (ns-resolve ns s)))
-  ([v]
-   (let [^clojure.lang.Var v (if (var? v) v (resolve v))
+  ([s]
+   (let [^clojure.lang.Var v (if (var? s) s (resolve s))
+         _ (when-not v
+             (throw (ex-info (format "Cannot resolve symbol %s" s) {})))
          ns (.ns v)
          s  (.sym v)]
      (if (and (ifn? @v) (-> v meta :macro not) (-> v meta ::traced not))
@@ -330,9 +332,11 @@ affecting the result."
 
 (defn traced?
   "Returns true if the given var is currently traced, false otherwise"
-  [v]
-  (let [^clojure.lang.Var v (if (var? v) v (resolve v))]
-    (-> v meta ::traced nil? not)))
+  [s]
+  (let [^clojure.lang.Var v (if (var? s) s (resolve s))]
+    (if-not v
+      (throw (ex-info (format "Symbol %s cannot be resolved" s) {}))
+      (-> v meta ::traced nil? not))))
 
 (defn all-fn-vars
   ([]
