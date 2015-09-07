@@ -103,7 +103,7 @@
 
 (defn- edn-str [x]
   (binding [*print-dup* true]
-    (pr-str x *out*)))
+    (pr-str x)))
 
 (defmulti to-transactions :type)
 
@@ -144,6 +144,7 @@
      {:db/id [:event/id call-event-id]
       :event/fn-return #db/id[:db.part/user -1]}]))
 
+(defmethod print-dup :default [o w] (print-method o w))
 
 (defmulti deserialise :event/type)
 
