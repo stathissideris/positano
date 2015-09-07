@@ -44,6 +44,8 @@
                (Thread/sleep interval)
                (recur))))))
 
-(defn foo [x]
-  (println "in recursive?" (in-recursive-stack?))
-  (if x (foo false) :done))
+(comment
+ (defn foo [x]
+   (println "in recursive?" (in-recursive-stack?))
+   (if x (foo false) :done)))
+
