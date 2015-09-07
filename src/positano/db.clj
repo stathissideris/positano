@@ -167,7 +167,6 @@
    (-> e :event/return-value read-edn-string)))
 
 
-(def ee (atom []))
 (defn event-channel
   "Make a channel which can receive events that will be sent to the
   datomic at the passed uri. The optional event-transformer allows
@@ -180,8 +179,6 @@
       (trace/without-recording ;;dynamic binding is thread-local so we need to say this once more here
        (loop []
          (when-let [event (event-transformer (<!! channel))]
-           (println "transformer" event-transformer)
-           (swap! ee conj event)
            (try
              @(d/transact conn (to-transactions event))
              (swap! event-counter inc)
