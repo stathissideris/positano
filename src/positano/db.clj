@@ -119,7 +119,7 @@
      :event/thread (:thread e)}
     (when (:fn-caller e)
       {:event/fn-caller [:event/id (:fn-caller e)]})
-    (when (seq (:args e))
+    (when (seq (:fn-args e))
       {:event/fn-args (map (fn [pos val]
                              {:fn-arg/position pos
                               :fn-arg/value (edn-str val)})
@@ -167,14 +167,21 @@
    (-> e :event/return-value read-edn-string)))
 
 
+(def ee (atom []))
 (defn event-channel
-  [uri]
-  (let [conn    (d/connect uri)
-        channel (async/chan 1024)]
+  "Make a channel which can receive events that will be sent to the
+  datomic at the passed uri. The optional event-transformer allows
+  somehow transforming the events before sending thme to datomic."
+  [uri & [event-transformer]]
+  (let [event-transformer (or event-transformer identity)
+        conn              (d/connect uri)
+        channel           (async/chan 1024)]
     (thread
       (trace/without-recording ;;dynamic binding is thread-local so we need to say this once more here
        (loop []
-         (when-let [event (<!! channel)]
+         (when-let [event (event-transformer (<!! channel))]
+           (println "transformer" event-transformer)
+           (swap! ee conj event)
            (try
              @(d/transact conn (to-transactions event))
              (swap! event-counter inc)
