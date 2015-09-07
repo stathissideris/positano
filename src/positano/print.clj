@@ -1,4 +1,7 @@
 (ns positano.print
+  (:refer-clojure :exclude [*print-length* *print-level* *verbose-defrecords* print-method print-dup
+                            pr print-simple print-ctor char-escape-string char-name-string
+                            primitives-classnames Throwable->map pr-str prn-str print-str println-str])
   (:import [java.io Writer]))
 
 (set! *warn-on-reflection* true)
