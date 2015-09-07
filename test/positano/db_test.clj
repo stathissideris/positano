@@ -15,7 +15,7 @@
 (deftest test-edn-str
   (is (= "[1 2 3]" (edn-str [1 2 3])))
   (is (= "SO FAKE!" (pr-str (FakeRecord. 6))))
-  (is (= "#positano.db_test.FakeRecord[6]" (edn-str (FakeRecord. 6))))
+  (is (= "#positano.db_test.FakeRecord{:foo 6}" (edn-str (FakeRecord. 6))))
   (let [[c _ s] (read-edn-string (edn-str (ByteBuffer/allocate 1)))]
-    (is (= java.nio.HeapByteBuffer c))
+    (is (= 'java.nio.HeapByteBuffer c))
     (is (= "java.nio.HeapByteBuffer[pos=0 lim=1 cap=1]" s))))

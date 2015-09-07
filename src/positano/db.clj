@@ -2,7 +2,8 @@
   (:require [datomic.api :as d]
             [clojure.edn :as edn]
             [clojure.core.async :as async :refer [<!! thread]]
-            [positano.trace :as trace]))
+            [positano.trace :as trace]
+            [positano.print :as pr]))
 
 (def event-counter (atom 0))
 
@@ -102,8 +103,7 @@
       uri)))
 
 (defn- edn-str [x]
-  (binding [*print-dup* true]
-    (pr-str x)))
+  (pr/pr-str x))
 
 (defmulti to-transactions :type)
 
@@ -143,8 +143,6 @@
       :event/fn-entry [:event/id call-event-id]}
      {:db/id [:event/id call-event-id]
       :event/fn-return #db/id[:db.part/user -1]}]))
-
-(defmethod print-dup :default [o w] (print-method o w))
 
 (defmulti deserialise :event/type)
 
