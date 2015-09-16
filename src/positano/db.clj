@@ -179,19 +179,22 @@
       (trace/without-recording ;;dynamic binding is thread-local so we need to say this once more here
        (loop []
          (let [event           (<!! channel)
-               processed-event (try
-                                 (event-transformer event)
-                                 (catch Exception e
-                                   (println e)
-                                   ::error))]
-           (when (and processed-event (not= ::error processed-event))
-             (try
-               @(d/transact conn (to-transactions processed-event))
-               (swap! event-counter inc)
-               (catch Exception e (println e)))
-             (recur)))))
-      ;;TODO do we need to close the connection here?
-      )
+               processed-event (when event
+                                 (try
+                                   (event-transformer event)
+                                   (catch Exception e
+                                     (println e)
+                                     ::error)))]
+           (cond (nil? event) nil ;;TODO do we need to close the connection here?
+                 (nil? processed-event) (recur)
+                 (= ::error processed-event) (recur)
+                 :else
+                 (do
+                  (try
+                    @(d/transact conn (to-transactions processed-event))
+                    (swap! event-counter inc)
+                    (catch Exception e (println e)))
+                  (recur)))))))
     channel))
 
 (defn clear-db! [conn]
