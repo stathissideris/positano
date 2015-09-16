@@ -158,7 +158,7 @@
    :event/fn-args
    (->> e :event/fn-args
         (sort-by :fn-arg/position)
-        (map (comp read-edn-string :fn-arg/value)))))
+        (mapv (comp read-edn-string :fn-arg/value)))))
 
 (defmethod deserialise :fn-return [e]
   (assoc
@@ -178,13 +178,18 @@
     (thread
       (trace/without-recording ;;dynamic binding is thread-local so we need to say this once more here
        (loop []
-         (when-let [event (event-transformer (<!! channel))]
-           (try
-             @(d/transact conn (to-transactions event))
-             (swap! event-counter inc)
-             (catch Exception e
-               (println "ERROR" (.getMessage e))))
-           (recur))))
+         (let [event           (<!! channel)
+               processed-event (try
+                                 (event-transformer event)
+                                 (catch Exception e
+                                   (println e)
+                                   ::error))]
+           (when (and processed-event (not= ::error processed-event))
+             (try
+               @(d/transact conn (to-transactions processed-event))
+               (swap! event-counter inc)
+               (catch Exception e (println e)))
+             (recur)))))
       ;;TODO do we need to close the connection here?
       )
     channel))
