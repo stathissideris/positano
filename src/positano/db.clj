@@ -52,6 +52,11 @@
     :db/valueType :db.type/string
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}
+   {:db/id #db/id[:db.part/db]
+    :db/ident :event/processed
+    :db/valueType :db.type/keyword
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
 
    ;;refs
    {:db/id #db/id[:db.part/db]
@@ -116,7 +121,8 @@
      :event/timestamp (:timestamp e)
      :event/fn-name (str (:fn-name e))
      :event/ns (str (:ns e))
-     :event/thread (:thread e)}
+     :event/thread (:thread e)
+     :event/processed (:processed e)}
     (when (:fn-caller e)
       {:event/fn-caller [:event/id (:fn-caller e)]})
     (when (seq (:fn-args e))
@@ -140,6 +146,7 @@
       :event/ns (str (:ns e))
       :event/thread (:thread e)
       :event/return-value (edn-str (:return-value e))
+      :event/processed (:processed e)
       :event/fn-entry [:event/id call-event-id]}
      {:db/id [:event/id call-event-id]
       :event/fn-return #db/id[:db.part/user -1]}]))
@@ -174,7 +181,12 @@
   [uri & [event-transformer]]
   (let [event-transformer (or event-transformer identity)
         conn              (d/connect uri)
-        channel           (async/chan 1024)]
+        channel           (async/chan 1024)
+        send-event!       (fn [e]
+                            (try
+                              @(d/transact conn (to-transactions e))
+                              (swap! event-counter inc)
+                              (catch Exception e (println e))))]
     (thread
       (trace/without-recording ;;dynamic binding is thread-local so we need to say this once more here
        (loop []
@@ -186,15 +198,17 @@
                                      (println e)
                                      ::error)))]
            (cond (nil? event) nil ;;TODO do we need to close the connection here?
-                 (nil? processed-event) (recur)
-                 (= ::error processed-event) (recur)
+                 (or (nil? processed-event)
+                     (= ::error processed-event))
+                 (do
+                   (send-event! (assoc event :processed :failed)) ;;send it anyway for consistency
+                   (recur))
                  :else
                  (do
-                  (try
-                    @(d/transact conn (to-transactions processed-event))
-                    (swap! event-counter inc)
-                    (catch Exception e (println e)))
-                  (recur)))))))
+                   (send-event! (if (= identity event-transformer)
+                                  (assoc processed-event :processed :no)
+                                  (assoc processed-event :processed :yes)))
+                   (recur)))))))
     channel))
 
 (defn clear-db! [conn]
