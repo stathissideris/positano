@@ -81,7 +81,5 @@
                     (filter q/fn-return?)
                     (map db/deserialise)
                     (map (juxt :event/fn-name :event/return-value))
-                    (into {}))))
-
-        (def events (map d/touch events))))
+                    (into {}))))))
     (tear-down uri)))

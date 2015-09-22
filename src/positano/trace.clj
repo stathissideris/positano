@@ -1,6 +1,7 @@
 (ns positano.trace
   (:require [clojure.core.async :as async :refer [>!!]]
-            [clojure.pprint :refer :all])
+            [clojure.pprint :refer :all]
+            [clojure.repl :as repl])
   (:require [positano.utils :refer [in-recursive-stack?]]))
 
 (def event-channel (atom nil))
@@ -286,20 +287,25 @@ affecting the result."
   `(do
      ~@(map trace-form body)))
 
-(defn trace-var*
+(defn- function->var [fun]
+  (some-> fun class .getName repl/demunge symbol resolve))
+
+(defn trace-var* ;;TODO rename this to reflect the fact that it also handles functions
   "If the specified Var holds an IFn and is not marked as a macro, its
-  contents is replaced with a version wrapped in a tracing call;
+  contents are replaced with a version wrapped in a tracing call;
   otherwise nothing happens. Can be undone with untrace-var.
 
   In the unary case, v should be a Var object or a symbol to be
-  resolved in the current namespace.
+  resolved in the current namespace, or a function that is named.
 
   In the binary case, ns should be a namespace object or a symbol
   naming a namespace and s a symbol to be resolved in that namespace."
   ([ns s]
      (trace-var* (ns-resolve ns s)))
   ([s]
-   (let [^clojure.lang.Var v (if (var? s) s (resolve s))
+   (let [^clojure.lang.Var v (cond (var? s) s
+                                   (fn? s) (function->var s)
+                                   (symbol? s) (resolve s))
          _ (when-not v
              (throw (ex-info (format "Cannot resolve symbol %s" s) {})))
          ns (.ns v)
