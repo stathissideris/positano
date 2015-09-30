@@ -136,15 +136,8 @@ that at your own risk):
 
 ## Next steps/roadmap
 
-* Test the event transforming function functionality and make it robust
-* Make keys sent to event channel be identical to what goes into datomic
-* Start collecting function facts in datomic (such as arg-lists)
-* Guard against record-event chain reactions blowing the stack
-* Function to trace/untrace whole codebase (consider including clojure.core)
 * Explore tracing individual S-expressions
 * Utilities for deriving schemas and type annotations
-* Run clojure.core tests, derive type annotations and compare to
-  existing (hand-crafted) annotations.
 
 ## License
 
