@@ -32,8 +32,19 @@ code slowly only to discover that the set of inputs is not the one
 that actually causes the bug we are looking for. Or in other cases,
 the logging is in the wrong place and we waste time moving it around
 (or making it more granular) and re-running until the bug becomes
-apparent. It's a slow process, but essential when coming into contact
-with code, our own or otherwise.
+apparent.
 
-What's more, all the information that comes out of reading code is
-ephemeral and unstructured.
+This process of *informal reasoning* is slow, but essential when
+coming into contact with code, our own or otherwise. What's more, all
+the information that comes out of this process is ephemeral and
+unstructured.
+
+The "holy grail" for the future direction of positano would be to
+provide a system that would capture, in a structured way, static
+information about the code, along with dynamic values (parameters and
+return values of functions and individual s-expressions) while the
+system runs, and would then provide programmatic and visual tools to
+interogate and explore the capture data in a way that 
+
+## Mockups
+
