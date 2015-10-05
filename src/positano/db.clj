@@ -53,8 +53,8 @@
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}
    {:db/id #db/id[:db.part/db]
-    :db/ident :event/processed
-    :db/valueType :db.type/keyword
+    :db/ident :event/time
+    :db/valueType :db.type/long
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}
 
@@ -110,44 +110,33 @@
 (defn- edn-str [x]
   (pr/pr-str x))
 
-(defmulti to-transactions :type)
+(defmulti to-transactions :event/type)
 
 (defmethod to-transactions :fn-call
   [e]
   [(merge
-    {:db/id #db/id[:db.part/user]
-     :event/type :fn-call
-     :event/id (str (:id e))
-     :event/timestamp (:timestamp e)
-     :event/fn-name (str (:fn-name e))
-     :event/ns (str (:ns e))
-     :event/thread (:thread e)
-     :event/processed (:processed e)}
-    (when (:fn-caller e)
-      {:event/fn-caller [:event/id (:fn-caller e)]})
-    (when (seq (:fn-args e))
+    (dissoc e :event/fn-caller :event/fn-args)
+    {:db/id #db/id[:db.part/user]}
+    (when (:event/fn-caller e)
+      {:event/fn-caller [:event/id (:event/fn-caller e)]})
+    (when (seq (:event/fn-args e))
       {:event/fn-args (map (fn [pos val]
                              {:fn-arg/position pos
                               :fn-arg/value (edn-str val)})
-                           (range) (:fn-args e))}))])
+                           (range) (:event/fn-args e))}))])
 
 (defn- return-id->call-id [id]
   (str "c" (subs id 1)))
 
 (defmethod to-transactions :fn-return
   [e]
-  (let [id (str (:id e))
+  (let [id (str (:event/id e))
         call-event-id (return-id->call-id id)]
-    [{:db/id #db/id[:db.part/user -1]
-      :event/type :fn-return
-      :event/id id
-      :event/timestamp (:timestamp e)
-      :event/fn-name (str (:fn-name e))
-      :event/ns (str (:ns e))
-      :event/thread (:thread e)
-      :event/return-value (edn-str (:return-value e))
-      :event/processed (:processed e)
-      :event/fn-entry [:event/id call-event-id]}
+    [(merge
+      e
+      {:db/id #db/id[:db.part/user -1]
+       :event/return-value (edn-str (:event/return-value e))
+       :event/fn-entry [:event/id call-event-id]})
      {:db/id [:event/id call-event-id]
       :event/fn-return #db/id[:db.part/user -1]}]))
 
@@ -176,12 +165,13 @@
 
 (defn event-channel
   "Make a channel which can receive events that will be sent to the
-  datomic at the passed uri. The optional event-transformer allows
+  datomic at the passed uri. The optional event-transducer allows
   somehow transforming the events before sending thme to datomic."
-  [uri & [event-transformer]]
-  (let [event-transformer (or event-transformer identity)
-        conn              (d/connect uri)
-        channel           (async/chan 1024)
+  [uri & [event-transducer]]
+  (let [conn              (d/connect uri)
+        channel           (if event-transducer
+                            (async/chan 1024 event-transducer)
+                            (async/chan 1024))
         send-event!       (fn [e]
                             (try
                               @(d/transact conn (to-transactions e))
@@ -190,25 +180,12 @@
     (thread
       (trace/without-recording ;;dynamic binding is thread-local so we need to say this once more here
        (loop []
-         (let [event           (<!! channel)
-               processed-event (when event
-                                 (try
-                                   (event-transformer event)
-                                   (catch Exception e
-                                     (println e)
-                                     ::error)))]
-           (cond (nil? event) nil ;;TODO do we need to close the connection here?
-                 (or (nil? processed-event)
-                     (= ::error processed-event))
-                 (do
-                   (send-event! (assoc event :processed :failed)) ;;send it anyway for consistency
-                   (recur))
-                 :else
-                 (do
-                   (send-event! (if (= identity event-transformer)
-                                  (assoc processed-event :processed :no)
-                                  (assoc processed-event :processed :yes)))
-                   (recur)))))))
+         (let [event           (<!! channel)]
+           (if (nil? event)
+             nil ;;TODO do we need to close the connection here?
+             (do
+               (send-event! event)
+               (recur)))))))
     channel))
 
 (defn clear-db! [conn]

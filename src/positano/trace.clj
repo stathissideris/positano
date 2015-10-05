@@ -44,7 +44,7 @@ affecting the result."
        (>!! @event-channel e)))))
 
 (defn base-trace []
-  {:timestamp (java.util.Date.)})
+  {:event/timestamp (java.util.Date.)})
 
 ;; stack tracking functions (track who calls what)
 (defn- maybe-init-thread-stack! [thread-id]
@@ -71,24 +71,24 @@ affecting the result."
    (let [id        (gensym "")
          thread-id (.getId (Thread/currentThread))
          event     (merge (base-trace)
-                          {:type :fn-call
-                           :id (str "c" id)
-                           :fn-name name
-                           :ns (.name ns)
-                           :thread thread-id
-                           :fn-caller (when-let [caller (current-caller thread-id)] (str "c" caller))
-                           :fn-args (into [] args)})]
+                          {:event/type      :fn-call
+                           :event/id        (str "c" id)
+                           :event/fn-name   (str name)
+                           :event/ns        (-> ns .name str)
+                           :event/thread    thread-id
+                           :event/fn-caller (when-let [caller (current-caller thread-id)] (str "c" caller))
+                           :event/fn-args   (into [] args)})]
      (with-recording (record-event event))
      (maybe-init-thread-stack! thread-id)
      (push-id-to-stack! thread-id id)
      (let [value (with-recording (apply f args))
            event (merge (base-trace)
-                        {:type :fn-return
-                         :id (str "r" id)
-                         :fn-name name
-                         :ns (.name ns)
-                         :thread thread-id
-                         :return-value value})]
+                        {:event/type         :fn-return
+                         :event/id           (str "r" id)
+                         :event/fn-name      (str name)
+                         :event/ns           (-> ns .name str)
+                         :event/thread       thread-id
+                         :event/return-value value})]
        (pop-stack! thread-id)
        (with-recording (record-event event))
        value))))

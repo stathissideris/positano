@@ -9,12 +9,10 @@
 (defn init-db!
   ([]
    (init-db! {}))
-  ([{:keys [event-transformer] :as opts}]
+  ([{:keys [event-transducer] :as opts}]
    (let [uri (db/memory-connection)]
      (reset! trace/event-channel
-             (if event-transformer
-               (db/event-channel uri event-transformer)
-               (db/event-channel uri)))
+             (db/event-channel uri event-transducer))
      uri)))
 
 (defn stop-db! [uri]
