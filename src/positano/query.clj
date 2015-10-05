@@ -3,7 +3,7 @@
             [datomic.api :as d]
             [positano.db :as db]
             [positano.time :as time]
-            [positano.analyze :as ana]))
+            [positano.reflect :as reflect]))
 
 (defn fn-call? [e] (= :fn-call (:event/type e)))
 (defn fn-return? [e] (= :fn-return (:event/type e)))
@@ -42,7 +42,7 @@
 
 (defn- arg-bindings [e]
   (let [fun (symbol (str (:event/ns e) "/" (:event/fn-name e)))
-        b (ana/bind-params fun (:event/fn-args e))]
+        b (reflect/bind-params fun (:event/fn-args e))]
     (str/join
      " "
      (for [[name value] b]
