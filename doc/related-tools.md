@@ -75,3 +75,66 @@ You can analyze the aliases for a namespace:
   ana clojure.tools.analyzer.jvm,
   e clojure.tools.analyzer.passes.jvm.emit-form}]
 ```
+
+## ASM
+
+The problem with using ASM to load the modified classes is that you
+need access to the class loader that loaded the original
+class. Clojure uses a dynamic class loader that can be accessed via:
+
+```clojure
+(clojure.lang.RT/baseLoader)
+```
+
+## Clojure compiler
+
+### How Clojure classes are compiled in memory
+
+The `clojure.lang.Compiler.ObjExpr` class contains a `bytecode` field
+which is populated by the `compile()` method os the same class. The
+`getCompiledClass()` method of `ObjExpr` sends the bytecode to the
+`DynamicClassLoader` via its `defineClass()` method. This also puts it
+in the cache of the `DynamicClassLoader`, but the bytecode is not kept
+around.
+
+But! The class loader used by the compiler is the dynamic var
+`clojure.lang.Compiler.LOADER`.
+
+## sleight
+
+[sleight](https://github.com/ztellman/sleight) does whole-program
+transformations, but has to be used via the lein-sleight plugin. The
+transformation is achieved by doing an `alter-var-root` on
+`clojure.core/load` and `clojure.core/eval`.
+
+You can start a REPL with sleight plugged in by doing (see
+sleight-test project):
+
+```
+lein sleight repl
+```
+
+The code does indeed get instrumented, but changing the code in a clj
+file and running `cider-load-buffer` (`c-c, c-k`) wipes out the
+instrumentation and you get un-transformed code.
+
+Next up, I would like to see if sleight survives a
+`clojure.tools.namespace/refresh`, but running this really messed up
+the state of namespaces etc in the project:
+
+```
+lein with-profile dev sleight repl
+```
+
+So I moved `org.clojure/tools.namespace` to the main dependencies. Which led to an error:
+
+```
+CompilerException java.lang.Exception: namespace 'clojure.tools.namespace.dependency' not found, compiling:(clojure/tools/namespace/track.clj:1:964)
+```
+
+The `clojure.tools.namespace.dependency` namespace comes from a
+`.cljc` file, which leads me to believe that maybe sleight does not
+play well with reader conditionals (sleight's own `project.clj`
+mentions clojure `1.5.1`). This
+[line](https://github.com/ztellman/sleight/blob/master/src/sleight/rt.clj#L74)
+suggests that sleight only looks for `.clj` files.
