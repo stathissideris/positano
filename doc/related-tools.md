@@ -98,7 +98,31 @@ in the cache of the `DynamicClassLoader`, but the bytecode is not kept
 around.
 
 But! The class loader used by the compiler is the dynamic var
-`clojure.lang.Compiler.LOADER`.
+`clojure.lang.Compiler.LOADER`. This is probably because,
+[as chouser points out](http://stackoverflow.com/questions/7471316/how-does-clojure-class-reloading-work), each top-level form uses its own class loader:
+
+```clojure
+> (deftype T [a b])
+> (def x (T. 1 2))
+> (deftype T [a b])
+> (def y (T. 3 4))
+> (-> x class .getClassLoader)
+#object[clojure.lang.DynamicClassLoader 0x428e8272 "clojure.lang.DynamicClassLoader@428e8272"]
+> (-> y class .getClassLoader)
+#object[clojure.lang.DynamicClassLoader 0x4e7886b8 "clojure.lang.DynamicClassLoader@4e7886b8"]
+> (cast T x)
+ClassCastException Cannot cast dev.T to dev.T  java.lang.Class.cast (Class.java:3369)
+```
+
+Looking at the Clojure implementation,
+`clojure.lang.RT/makeClassLoader` is called by
+`clojure.lang.Compiler/load`, `clojure.lang.Compiler/eval` and
+`clojure.lang.Compiler/compile1`.
+
+[This post](http://hum.ph/classloader-swapping-in-clojure) indicates
+that it is possible to swap class loaders in Clojure pretty easily, so
+it would be possible to make a class loader that intruments the
+bytecode passed to it.
 
 ## sleight
 
