@@ -114,6 +114,30 @@ But! The class loader used by the compiler is the dynamic var
 ClassCastException Cannot cast dev.T to dev.T  java.lang.Class.cast (Class.java:3369)
 ```
 
+Also:
+
+```
+> (do
+    (println @clojure.lang.Compiler/LOADER)
+    (println @clojure.lang.Compiler/LOADER)
+    (println @clojure.lang.Compiler/LOADER))
+#object[clojure.lang.DynamicClassLoader 0x4297d52f clojure.lang.DynamicClassLoader@4297d52f]
+#object[clojure.lang.DynamicClassLoader 0x1f55ba09 clojure.lang.DynamicClassLoader@1f55ba09]
+#object[clojure.lang.DynamicClassLoader 0x215572da clojure.lang.DynamicClassLoader@215572da]
+```
+
+BUT!! Look at that:
+
+```
+> (let [a 6]
+    (println @clojure.lang.Compiler/LOADER)
+    (println @clojure.lang.Compiler/LOADER)
+    (println @clojure.lang.Compiler/LOADER))
+#object[clojure.lang.DynamicClassLoader 0x3bac38f0 clojure.lang.DynamicClassLoader@3bac38f0]
+#object[clojure.lang.DynamicClassLoader 0x3bac38f0 clojure.lang.DynamicClassLoader@3bac38f0]
+#object[clojure.lang.DynamicClassLoader 0x3bac38f0 clojure.lang.DynamicClassLoader@3bac38f0]
+```
+
 Looking at the Clojure implementation,
 `clojure.lang.RT/makeClassLoader` is called by
 `clojure.lang.Compiler/load`, `clojure.lang.Compiler/eval` and
