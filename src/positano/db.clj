@@ -7,6 +7,8 @@
 
 (def event-counter (atom 0))
 
+(def event-sequence (atom 0))
+
 (def db-uri-base "datomic:mem://")
 
 (def schema
@@ -53,7 +55,7 @@
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}
    {:db/id #db/id[:db.part/db]
-    :db/ident :event/time
+    :db/ident :event/sequence
     :db/valueType :db.type/long
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}
@@ -95,7 +97,8 @@
 
 (defn destroy-db! [uri]
   (when (d/delete-database uri)
-    (reset! event-counter 0)))
+    (reset! event-counter 0)
+    (reset! event-sequence 0)))
 
 (defn memory-connection
   "Create a connection to an anonymous, in-memory database."
@@ -114,9 +117,11 @@
 
 (defmethod to-transactions :fn-call
   [e]
+  (swap! event-sequence inc)
   [(merge
     (dissoc e :event/fn-caller :event/fn-args)
-    {:db/id #db/id[:db.part/user]}
+    {:db/id #db/id[:db.part/user]
+     :event/sequence @event-sequence}
     (when (:event/fn-caller e)
       {:event/fn-caller [:event/id (:event/fn-caller e)]})
     (when (seq (:event/fn-args e))
@@ -130,11 +135,13 @@
 
 (defmethod to-transactions :fn-return
   [e]
+  (swap! event-sequence inc)
   (let [id (str (:event/id e))
         call-event-id (return-id->call-id id)]
     [(merge
       e
       {:db/id #db/id[:db.part/user -1]
+       :event/sequence @event-sequence
        :event/return-value (edn-str (:event/return-value e))
        :event/fn-entry [:event/id call-event-id]})
      {:db/id [:event/id call-event-id]

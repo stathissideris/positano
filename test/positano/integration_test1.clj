@@ -47,13 +47,13 @@
     (let [db (d/db conn)]
       (let [events (q/all-function-events db)]
         (is (= 6 (count events)))
-        (is (= #{["baz" :fn-call]
-                 ["baz" :fn-return]
-                 ["bar" :fn-call]
-                 ["bar" :fn-return]
-                 ["foo" :fn-call]
-                 ["foo" :fn-return]}
-               (->> events (map (juxt :event/fn-name :event/type)) set)))
+        (is (= #{[1 "foo" :fn-call]
+                 [2 "bar" :fn-call]
+                 [3 "baz" :fn-call]
+                 [4 "baz" :fn-return]
+                 [5 "bar" :fn-return]
+                 [6 "foo" :fn-return]}
+               (->> events (map (juxt :event/sequence :event/fn-name :event/type)) set)))
 
         ;;test function arguments
         (is (= {"foo" [[5 10 20 40]]
