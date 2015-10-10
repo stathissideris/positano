@@ -1,26 +1,14 @@
 (ns positano.reflect-test
   (:require [positano.reflect :refer :all]
-            [clojure.test :refer :all]))
-
-(def ooo 999)
-
-(defn aa
-  ([x y [a b]] 0)
-  ([x y z [a b]] 0))
-
-(def bb (fn [x y [a b]] 0))
-
-(def cc
-  (fn
-    ([x y [a b]] 0)
-    ([x y z [a b]] 0)))
+            [clojure.test :refer :all]
+            [positano.reflect-test.fun :refer :all]))
 
 (deftest test-arg-lists
   (is (thrown? Exception (arg-lists 'non-existent)))
   (is (thrown? Exception (arg-lists 'ooo)))
-  (is (= '[[x y [a b]] [x y z [a b]]] (arg-lists 'aa)))
-  (is (= '[[x y [a b]]] (arg-lists 'bb)))
-  (is (= '[[x y [a b]] [x y z [a b]]] (arg-lists 'cc))))
+  (is (= '[[x y [a b]] [x y z [a b]]] (arg-lists 'positano.reflect-test.fun/aa)))
+  (is (= '[[x y [a b]]] (arg-lists 'positano.reflect-test.fun/bb)))
+  (is (= '[[x y [a b]] [x y z [a b]]] (arg-lists 'positano.reflect-test.fun/cc))))
 
 (deftest test-arg-names
   (is (= '(x y a b) (arg-names '[x y a b])))

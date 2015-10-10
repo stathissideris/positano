@@ -7,13 +7,13 @@
             [positano.utils :refer [block-until]]
             [positano.core :refer :all]
             [datascript.core :as d]
-            [positano.integration-test4.fun :as fun]))
+            [positano.integration-test4.fun]))
 
 ;;test simple tracing using selectors based on ns prefix
 
 (defn setup []
   (trace/untrace-all)
-
+  (require '[positano.integration-test4.fun] :reload)
   (->> (trace/all-fn-vars)
        (filter #(trace/ns-prefix? % "positano.integration-test4.f"))
        (map trace/trace-var*)
@@ -23,7 +23,7 @@
   (stop-db! conn)
   (trace/untrace-all))
 
-(deftest simple-tracing
+(deftest simple-tracing4
   (let [conn (init-db!)]
 
     (setup)
@@ -34,7 +34,7 @@
                "#'positano.integration-test4.fun/bar"
                "#'positano.integration-test4.fun/foo"} traced)))
     
-    (fun/foo [5 10 20 40])
+    (positano.integration-test4.fun/foo [5 10 20 40])
     
     (is (not= :timed-out (block-until #(= 6 @db/event-counter) 10 3000)))
 

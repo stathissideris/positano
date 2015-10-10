@@ -19,7 +19,7 @@
    :event/id
    {:db/cardinality :db.cardinality/one
     :db/index       true
-    :db/unique      :db.unique/value}
+    :db/unique      :db.unique/identity}
      
    :event/timestamp
    {:db/cardinality :db.cardinality/one

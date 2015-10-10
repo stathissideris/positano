@@ -42,7 +42,7 @@
   (stop-db! conn)
   (trace/untrace-all))
 
-(deftest simple-tracing
+(deftest test-pin-point-query
   (let [conn (init-db!)]
 
     (setup)

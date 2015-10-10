@@ -1,28 +1,18 @@
 (ns positano.event-transformation-test
   (:require [clojure.test :refer :all]
-            [positano.trace :as trace :refer [deftrace]]
+            [positano.trace :as trace]
             [positano.db :as db]
             [positano.query :as q]
             [positano.utils :refer [block-until]]
             [positano.core :refer :all]
-            [datascript.core :as d]))
+            [datascript.core :as d]
+            [positano.event-transformation-test.fun]))
 
 ;;test simple tracing with mixture of deftrace and trace-var*
 
 (defn setup []
   (trace/untrace-all)
-  
-  (deftrace baz [x]
-    (inc x))
-
-  (deftrace bar [x]
-    (* (baz (/ x 2.0)) 3))
-
-  (deftrace foo
-    "I don't do a whole lot."
-    [x]
-    (println "Hello World!")
-    (bar (first x))))
+  (require '[positano.event-transformation-test.fun] :reload))
 
 (defn tear-down [conn]
   (stop-db! conn)
@@ -37,7 +27,7 @@
 
     (setup)
 
-    (foo [5 10 20 40])
+    (positano.event-transformation-test.fun/foo [5 10 20 40])
 
     (is (not= :timed-out (block-until #(= 6 @db/event-counter) 10 3000)))
 

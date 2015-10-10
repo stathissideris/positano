@@ -5,43 +5,32 @@
             [positano.query :as q]
             [positano.utils :refer [block-until]]
             [positano.core :refer :all]
-            [datascript.core :as d]))
+            [datascript.core :as d]
+            [positano.integration-test2.fun]))
 
 ;;test simple tracing with mixture of deftrace and trace-var*
 
 (defn setup []
   (trace/untrace-all)
-  
-  (trace/deftrace baz [x]
-    (inc x))
-
-  (trace/deftrace bar [x]
-    (* (baz (/ x 2.0)) 3))
-
-  (defn foo
-    "I don't do a whole lot."
-    [x]
-    (println "Hello World!")
-    (bar (first x)))
-
-  (trace/trace-var* 'foo))
+  (require '[positano.integration-test2.fun] :reload)
+  (trace/trace-var* 'positano.integration-test2.fun/foo))
 
 (defn tear-down [conn]
   (stop-db! conn)
   (trace/untrace-all))
 
-(deftest simple-tracing
+(deftest simple-tracing2
   (let [conn (init-db!)]
 
     (setup)
 
     (let [traced (set (map str (filter trace/traced? (trace/all-fn-vars))))]
       (is (= 3 (count traced)))
-      (is (= #{"#'positano.integration-test2/baz"
-               "#'positano.integration-test2/bar"
-               "#'positano.integration-test2/foo"} traced)))
+      (is (= #{"#'positano.integration-test2.fun/baz"
+               "#'positano.integration-test2.fun/bar"
+               "#'positano.integration-test2.fun/foo"} traced)))
     
-    (foo [5 10 20 40])
+    (positano.integration-test2.fun/foo [5 10 20 40])
 
     (is (not= :timed-out (block-until #(= 6 @db/event-counter) 10 3000)))
 
