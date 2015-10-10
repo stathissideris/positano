@@ -1,6 +1,6 @@
-(defproject positano "0.2.0-SNAPSHOT"
-  :description "FIXME: write description"
-  :url "http://example.com/FIXME"
+(defproject positano "0.2.0"
+  :description "Provenace system for Clojure"
+  :url "https://github.com/stathissideris/positano"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.7.0"]
