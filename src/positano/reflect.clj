@@ -1,11 +1,5 @@
 (ns positano.reflect
-  (:require [clojure.walk :as walk]
-            [clojure.repl :refer [source-fn]]))
-
-(defn walk-select-keys [m ks]
-  (walk/prewalk
-   (fn [x] (if-not (map? x) x
-                   (select-keys x ks))) m))
+  (:require [clojure.repl :refer [source-fn]]))
 
 (defn arg-lists
   "fun should be a symbol that resolves to a function. Does not work

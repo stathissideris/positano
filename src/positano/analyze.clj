@@ -1,8 +1,20 @@
 (ns positano.analyze
-  (:require [clojure.tools.analyzer.jvm :as ana]
+  (:require [clojure.walk :as walk]
+            [clojure.tools.analyzer.jvm :as ana]
             [clojure.tools.analyzer.passes.jvm.emit-form :as e]))
 
+(defn walk-select-keys [m ks]
+  (walk/prewalk
+   (fn [x] (if-not (map? x) x
+                   (select-keys x ks))) m))
+
 (comment
+
+  ;;keys to follow:
+  ;;{:op :fn-method :body ... :params [...]}
+  ;;{:op :do :statements [...]}
+  ;;{:op :static-call :args [{:op :local :name x__#0} {:op :const :val 1}] :method add}
+  ;;{:op :let, :body ... :bindings [...]}
   
   (def xx
     (ana/analyze
@@ -133,4 +145,31 @@
            (+ x 1)
            (* x 2))))
       (assoc-in [:init :methods 1 :body :statements] [])
-      (e/emit-form)))
+      (e/emit-form))
+
+
+  (-> (walk-select-keys
+       (ana/analyze '(let [a 6 b 7] (+ a b)))
+       [:op :init :methods :body :statements :val :children :bindings
+        :args :name :ret :method :params :variadic? :fixed-arity])
+      clojure.pprint/pprint)
+
+  {:op :let,
+   :body
+   {:op :static-call,
+    :children [:args],
+    :args
+    [{:op :local, :children [], :name a__#0}
+     {:op :local, :children [], :name b__#0}],
+    :method add},
+   :children [:bindings :body],
+   :bindings
+   [{:op :binding,
+     :init {:op :const, :val 6},
+     :children [:init],
+     :name a__#0}
+    {:op :binding,
+     :init {:op :const, :val 7},
+     :children [:init],
+     :name b__#0}]}
+  )
