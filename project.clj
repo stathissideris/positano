@@ -1,4 +1,4 @@
-(defproject positano "0.2.0"
+(defproject positano "0.3.0-SNAPSHOT"
   :description "Provenace system for Clojure"
   :url "https://github.com/stathissideris/positano"
   :license {:name "Eclipse Public License"
