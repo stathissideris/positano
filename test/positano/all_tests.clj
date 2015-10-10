@@ -1,7 +1,7 @@
 (ns positano.all-tests
   (:require  [clojure.test :as t]))
 
-(defn test-all []
+(defn run-tests []
   (t/run-tests
    'positano.integration-test1
    'positano.integration-test2

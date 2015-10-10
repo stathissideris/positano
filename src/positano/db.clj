@@ -2,8 +2,7 @@
   (:require [datascript.core :as d]
             [clojure.edn :as edn]
             [clojure.core.async :as async :refer [<!! thread]]
-            [positano.trace :as trace]
-            [positano.print :as pr]))
+            [positano.trace :as trace]))
 
 (def event-counter (atom 0))
 
@@ -78,9 +77,6 @@
   []
   (d/create-conn schema))
 
-(defn- edn-str [x]
-  (pr/pr-str x))
-
 (defmulti to-transactions :event/type)
 
 (defmethod to-transactions :fn-call
@@ -95,7 +91,7 @@
     (when (seq (:event/fn-args e))
       {:event/fn-args (map (fn [pos val]
                              {:fn-arg/position pos
-                              :fn-arg/value (edn-str val)})
+                              :fn-arg/value val})
                            (range) (:event/fn-args e))}))])
 
 (defn- return-id->call-id [id]
@@ -110,18 +106,12 @@
       e
       {:db/id -100
        :event/sequence @event-sequence
-       :event/return-value (edn-str (:event/return-value e))
+       :event/return-value (:event/return-value e)
        :event/fn-entry [:event/id call-event-id]})
      {:db/id [:event/id call-event-id]
       :event/fn-return -100}]))
 
 (defmulti deserialise :event/type)
-
-(defn- read-edn-string [s]
-  (try
-    (edn/read-string {:default (fn [_ x] x)} s)
-    (catch Exception e
-      (throw (ex-info "Cannot read EDN string" {:string s} e)))))
 
 (defmethod deserialise :fn-call [e]
   (assoc
@@ -129,14 +119,9 @@
    :event/fn-args
    (->> e :event/fn-args
         (sort-by :fn-arg/position)
-        (mapv (comp read-edn-string :fn-arg/value)))))
+        (mapv :fn-arg/value))))
 
-(defmethod deserialise :fn-return [e]
-  (assoc
-   (into {} e)
-   :event/return-value
-   (-> e :event/return-value read-edn-string)))
-
+(defmethod deserialise :fn-return [e] e)
 
 (defn event-channel
   "Make a channel which can receive events that will be sent to the
