@@ -1,5 +1,5 @@
 (ns positano.db
-  (:require [datomic.api :as d]
+  (:require [datascript.core :as d]
             [clojure.edn :as edn]
             [clojure.core.async :as async :refer [<!! thread]]
             [positano.trace :as trace]
@@ -12,103 +12,71 @@
 (def db-uri-base "datomic:mem://")
 
 (def schema
-  [{:db/id #db/id[:db.part/db]
-    :db/ident :event/type
-    :db/valueType :db.type/keyword
-    :db/cardinality :db.cardinality/one
-    :db/index true
-    :db.install/_attribute :db.part/db}
-   {:db/id #db/id[:db.part/db]
-    :db/ident :event/id
-    :db/valueType :db.type/string
-    :db/cardinality :db.cardinality/one
-    :db/index true
-    :db/unique :db.unique/value
-    :db.install/_attribute :db.part/db}
-   {:db/id #db/id[:db.part/db]
-    :db/ident :event/timestamp
-    :db/valueType :db.type/instant
-    :db/cardinality :db.cardinality/one
-    :db/index true
-    :db.install/_attribute :db.part/db}
-   {:db/id #db/id[:db.part/db]
-    :db/ident :event/fn-name
-    :db/valueType :db.type/string
-    :db/cardinality :db.cardinality/one
-    :db/index true
-    :db.install/_attribute :db.part/db}
-   {:db/id #db/id[:db.part/db]
-    :db/ident :event/ns
-    :db/valueType :db.type/string
-    :db/cardinality :db.cardinality/one
-    :db/index true
-    :db.install/_attribute :db.part/db}
-   {:db/id #db/id[:db.part/db]
-    :db/ident :event/thread
-    :db/valueType :db.type/long
-    :db/cardinality :db.cardinality/one
-    :db/index true
-    :db.install/_attribute :db.part/db}
-   {:db/id #db/id[:db.part/db]
-    :db/ident :event/return-value
-    :db/valueType :db.type/string
-    :db/cardinality :db.cardinality/one
-    :db.install/_attribute :db.part/db}
-   {:db/id #db/id[:db.part/db]
-    :db/ident :event/sequence
-    :db/valueType :db.type/long
-    :db/cardinality :db.cardinality/one
-    :db.install/_attribute :db.part/db}
+  {:event/type
+   {:db/cardinality :db.cardinality/one
+    :db/index       true}
+     
+   :event/id
+   {:db/cardinality :db.cardinality/one
+    :db/index       true
+    :db/unique      :db.unique/value}
+     
+   :event/timestamp
+   {:db/cardinality :db.cardinality/one
+    :db/index       true}
+     
+   :event/fn-name
+   {:db/cardinality :db.cardinality/one
+    :db/index       true}
+     
+   :event/ns
+   {:db/cardinality :db.cardinality/one
+    :db/index       true}
+     
+   :event/thread
+   {:db/cardinality :db.cardinality/one
+    :db/index       true}
+     
+   :event/return-value
+   {:db/cardinality :db.cardinality/one}
+     
+   :event/sequence
+   {:db/cardinality :db.cardinality/one}
 
    ;;refs
-   {:db/id #db/id[:db.part/db]
-    :db/ident :event/fn-entry
-    :db/valueType :db.type/ref
-    :db/cardinality :db.cardinality/one
-    :db.install/_attribute :db.part/db}
-   {:db/id #db/id[:db.part/db]
-    :db/ident :event/fn-return
-    :db/valueType :db.type/ref
-    :db/cardinality :db.cardinality/one
-    :db.install/_attribute :db.part/db}
-   {:db/id #db/id[:db.part/db]
-    :db/ident :event/fn-caller
-    :db/valueType :db.type/ref
-    :db/cardinality :db.cardinality/one
-    :db.install/_attribute :db.part/db}
-   
+   :event/fn-entry
+   {:db/valueType   :db.type/ref
+    :db/cardinality :db.cardinality/one}
+     
+   :event/fn-return
+   {:db/valueType   :db.type/ref
+    :db/cardinality :db.cardinality/one}
+     
+   :event/fn-caller
+   {:db/valueType   :db.type/ref
+    :db/cardinality :db.cardinality/one}
+     
    ;;fn args
-   {:db/id #db/id[:db.part/db]
-    :db/ident :event/fn-args
-    :db/valueType :db.type/ref
+   :event/fn-args
+   {:db/valueType   :db.type/ref
     :db/isComponent true
-    :db/cardinality :db.cardinality/many
-    :db.install/_attribute :db.part/db}
-   {:db/id #db/id[:db.part/db]
-    :db/ident :fn-arg/value
-    :db/valueType :db.type/string
-    :db/cardinality :db.cardinality/one
-    :db.install/_attribute :db.part/db}
-   {:db/id #db/id[:db.part/db]
-    :db/ident :fn-arg/position
-    :db/valueType :db.type/long
-    :db/cardinality :db.cardinality/one
-    :db.install/_attribute :db.part/db}])
+    :db/cardinality :db.cardinality/many}
+     
+   :fn-arg/value
+   {:db/cardinality :db.cardinality/one}
+     
+   :fn-arg/position
+   {:db/cardinality :db.cardinality/one
+    }})
 
 (defn destroy-db! [uri]
-  (when (d/delete-database uri)
-    (reset! event-counter 0)
-    (reset! event-sequence 0)))
+  ;;TODO delete database here?
+  (reset! event-counter 0)
+  (reset! event-sequence 0))
 
-(defn memory-connection
-  "Create a connection to an anonymous, in-memory database."
+(defn init-connection
   []
-  (let [uri (str db-uri-base (d/squuid))]
-    (destroy-db! uri)
-    (d/create-database uri)
-    (let [conn (d/connect uri)]
-      @(d/transact conn schema)
-      uri)))
+  (d/create-conn schema))
 
 (defn- edn-str [x]
   (pr/pr-str x))
@@ -120,7 +88,7 @@
   (swap! event-sequence inc)
   [(merge
     (dissoc e :event/fn-caller :event/fn-args)
-    {:db/id #db/id[:db.part/user]
+    {:db/id -1
      :event/sequence @event-sequence}
     (when (:event/fn-caller e)
       {:event/fn-caller [:event/id (:event/fn-caller e)]})
@@ -140,12 +108,12 @@
         call-event-id (return-id->call-id id)]
     [(merge
       e
-      {:db/id #db/id[:db.part/user -1]
+      {:db/id -100
        :event/sequence @event-sequence
        :event/return-value (edn-str (:event/return-value e))
        :event/fn-entry [:event/id call-event-id]})
      {:db/id [:event/id call-event-id]
-      :event/fn-return #db/id[:db.part/user -1]}]))
+      :event/fn-return -100}]))
 
 (defmulti deserialise :event/type)
 
@@ -174,9 +142,8 @@
   "Make a channel which can receive events that will be sent to the
   datomic at the passed uri. The optional event-transducer allows
   somehow transforming the events before sending thme to datomic."
-  [uri & [event-transducer]]
-  (let [conn              (d/connect uri)
-        channel           (if event-transducer
+  [conn & [event-transducer]]
+  (let [channel           (if event-transducer
                             (async/chan 1024 event-transducer)
                             (async/chan 1024))
         send-event!       (fn [e]
@@ -200,21 +167,21 @@
   )
 
 (comment
-  (def conn (memory-connection))
+  (def conn (init-connection))
   (def ch (event-channel conn))
 
   (async/>!! ch {:type :fn-call :id "t999" :fn-name "function-name" :ns "positano.core" :args [1 2 3] :timestamp (java.util.Date.)})
   
   @(d/transact
     conn
-    [{:db/id #db/id[:db.part/user]
-      :event/type :fn-call
-      :event/id "t999"
+    [{:db/id           -1
+      :event/type      :fn-call
+      :event/id        "t999"
       :event/timestamp (java.util.Date.)
-      :event/fn-name "foo"
-      :event/ns "positano.core"
-      :event/fn-args [{:fn-arg/position 0 :fn-arg/value "9"}
-                      {:fn-arg/position 1 :fn-arg/value "[1 2]"}]}])
+      :event/fn-name   "foo"
+      :event/ns        "positano.core"
+      :event/fn-args   [{:fn-arg/position 0 :fn-arg/value "9"}
+                        {:fn-arg/position 1 :fn-arg/value "[1 2]"}]}])
   
   ;;;;
 

@@ -5,7 +5,7 @@
             [positano.query :as q]
             [positano.utils :refer [block-until]]
             [positano.core :refer :all]
-            [datomic.api :as d]))
+            [datascript.core :as d]))
 
 ;;test simple tracing with mixture of deftrace and trace-var*
 
@@ -24,17 +24,16 @@
     (println "Hello World!")
     (bar (first x))))
 
-(defn tear-down [uri]
-  (stop-db! uri)
+(defn tear-down [conn]
+  (stop-db! conn)
   (trace/untrace-all))
 
 (deftest test-simple-transform
-  (let [uri  (init-db!
+  (let [conn (init-db!
               {:event-transducer
                (map
                 (fn [e]
-                  (update-in e [:event/fn-name] #(str % "-FOO"))))})
-        conn (d/connect uri)]
+                  (update-in e [:event/fn-name] #(str % "-FOO"))))})]
 
     (setup)
 
@@ -52,7 +51,7 @@
                ["foo-FOO" :fn-call]
                ["foo-FOO" :fn-return]}
              (->> events (map (juxt :event/fn-name :event/type)) set))))
-    (tear-down uri)))
+    (tear-down conn)))
 
 (comment
  (deftest test-transform-throwing-exception
@@ -81,4 +80,4 @@
                 ["foo-FOO" :fn-call :yes]
                 ["foo-FOO" :fn-return :yes]}
               (->> events (map (juxt :event/fn-name :event/type)) set))))
-     (tear-down uri))))
+     (tear-down conn))))

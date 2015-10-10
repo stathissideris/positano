@@ -6,7 +6,7 @@
             [positano.query :as q]
             [positano.utils :refer [block-until]]
             [positano.core :refer :all]
-            [datomic.api :as d]))
+            [datascript.core :as d]))
 
 ;;test simple tracing which includes a core library function
 
@@ -27,13 +27,12 @@
 
   (trace/trace-var* 'clojure.string 'join))
 
-(defn tear-down [uri]
-  (stop-db! uri)
+(defn tear-down [conn]
+  (stop-db! conn)
   (trace/untrace-all))
 
 (deftest simple-tracing
-  (let [uri  (init-db!)
-        conn (d/connect uri)]
+  (let [conn (init-db!)]
 
     (setup)
 
@@ -82,4 +81,4 @@
                     (map db/deserialise)
                     (map (juxt :event/fn-name :event/return-value))
                     (into {}))))))
-    (tear-down uri)))
+    (tear-down conn)))

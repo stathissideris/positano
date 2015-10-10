@@ -6,7 +6,7 @@
             [positano.query :as q]
             [positano.utils :refer [block-until]]
             [positano.core :refer :all]
-            [datomic.api :as d]))
+            [datascript.core :as d]))
 
 ;;explore values being passed between functions using datomic queries
 
@@ -38,13 +38,12 @@
   (doseq [f funs]
     (trace/trace-var* f)))
 
-(defn tear-down [uri]
-  (stop-db! uri)
+(defn tear-down [conn]
+  (stop-db! conn)
   (trace/untrace-all))
 
 (deftest simple-tracing
-  (let [uri  (init-db!)
-        conn (d/connect uri)]
+  (let [conn (init-db!)]
 
     (setup)
 
@@ -127,4 +126,4 @@
           (is (= "step6" (ffirst res)))
 ;;          (def events (map d/touch events))
           )))
-    (tear-down uri)))
+    (tear-down conn)))

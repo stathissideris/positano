@@ -6,7 +6,7 @@
             [positano.query :as q]
             [positano.utils :refer [block-until]]
             [positano.core :refer :all]
-            [datomic.api :as d]
+            [datascript.core :as d]
             [positano.integration-test4.fun :as fun]))
 
 ;;test simple tracing using selectors based on ns prefix
@@ -19,13 +19,12 @@
        (map trace/trace-var*)
        (doall)))
 
-(defn tear-down [uri]
-  (stop-db! uri)
+(defn tear-down [conn]
+  (stop-db! conn)
   (trace/untrace-all))
 
 (deftest simple-tracing
-  (let [uri  (init-db!)
-        conn (d/connect uri)]
+  (let [conn (init-db!)]
 
     (setup)
 
@@ -71,4 +70,4 @@
                     (into {}))))
 
         (def events (map d/touch events))))
-    (tear-down uri)))
+    (tear-down conn)))

@@ -1,6 +1,6 @@
 (ns positano.query
   (:require [clojure.string :as str]
-            [datomic.api :as d]
+            [datascript.core :as d]
             [positano.db :as db]
             [positano.time :as time]
             [positano.reflect :as reflect]))

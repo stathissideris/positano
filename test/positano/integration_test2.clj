@@ -5,7 +5,7 @@
             [positano.query :as q]
             [positano.utils :refer [block-until]]
             [positano.core :refer :all]
-            [datomic.api :as d]))
+            [datascript.core :as d]))
 
 ;;test simple tracing with mixture of deftrace and trace-var*
 
@@ -26,13 +26,12 @@
 
   (trace/trace-var* 'foo))
 
-(defn tear-down [uri]
-  (stop-db! uri)
+(defn tear-down [conn]
+  (stop-db! conn)
   (trace/untrace-all))
 
 (deftest simple-tracing
-  (let [uri  (init-db!)
-        conn (d/connect uri)]
+  (let [conn (init-db!)]
 
     (setup)
 
@@ -56,4 +55,4 @@
                ["foo" :fn-call]
                ["foo" :fn-return]}
              (->> events (map (juxt :event/fn-name :event/type)) set))))
-    (tear-down uri)))
+    (tear-down conn)))

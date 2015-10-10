@@ -1,5 +1,5 @@
 (ns positano.core
-  (:require [datomic.api :as d]
+  (:require [datascript.core :as d]
             [clojure.core.async :as async :refer [>!!]]
             [positano.trace :as trace :refer [deftrace]]
             [positano.db :as db]
@@ -10,21 +10,17 @@
   ([]
    (init-db! {}))
   ([{:keys [event-transducer] :as opts}]
-   (let [uri (db/memory-connection)]
+   (let [conn (db/init-connection)]
      (reset! trace/event-channel
-             (db/event-channel uri event-transducer))
-     uri)))
+             (db/event-channel conn event-transducer))
+     conn)))
 
-(defn stop-db! [uri]
+(defn stop-db! [conn]
   (async/close! @trace/event-channel)
-  (db/destroy-db! uri))
+  (db/destroy-db! conn))
 
 (defn clear-db! [conn]
   (db/clear-db! conn))
-
-
-(comment
-  (def uri (init-db!)))
 
 (comment
   (do
@@ -37,8 +33,7 @@
     (deftrace foo [b x c d]
       (bar (inc x)))
     
-    (def uri (init-db!))
-    (def conn (d/connect uri)))
+    (def conn (init-db!)))
   
   (foo 5 10 20 40)
 
