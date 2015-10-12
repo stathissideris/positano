@@ -180,4 +180,18 @@
   (def ent (d/entity db q-result))
 
   (d/touch ent)
-)
+
+  (defn partition-at
+  ([sep? coll]
+   (lazy-seq
+    (when-let [s (seq coll)]
+      (let [first-sep? (sep? (first s))
+            run        (take-while #(not (sep? %)) (if first-sep? (next s) s))
+            run        (if first-sep?
+                         (cons (first s) run)
+                         run)]
+        (cons run (partition-at sep? (seq (drop (count run) s)))))))))
+
+  (partition-at #{:sep} [1 2 3 4 :sep 5 6 7 :seq 8 9 10 11 12 13 14])
+  (partition-at #{:sep} [:sep 1 2 3 4 :sep 5 6 7 :sep 8 9 10 11 12 13 14])
+  )
