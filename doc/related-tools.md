@@ -12,9 +12,9 @@ For example, do:
 
 > (require '[refactor-nrepl.find.find-symbol :as fs])
 > (fs/find-symbol
-    {:file "s:/devel/positano/src/positano/analyze.clj"
-     :line 19
-     :column 47
+    {:file "s:/devel/positano/src/positano/reflect.clj"
+     :line 18
+     :column 32
      :name "fun"})
 ```
 
