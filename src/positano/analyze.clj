@@ -1,12 +1,28 @@
-(ns positano.analyze
+>(ns positano.analyze
   (:require [clojure.walk :as walk]
             [clojure.tools.analyzer.jvm :as ana]
-            [clojure.tools.analyzer.passes.jvm.emit-form :as e]))
+            [clojure.tools.analyzer.passes.jvm.emit-form :as e]
+            [clojure.tools.analyzer.ast :as ast]
+            [clojure.pprint :refer [pprint]]))
 
 (defn walk-select-keys [m ks]
   (walk/prewalk
    (fn [x] (if-not (map? x) x
                    (select-keys x ks))) m))
+
+(defn walk-dissoc [m ks]
+  (walk/prewalk
+   (fn [x] (if-not (map? x) x
+                   (apply dissoc x ks))) m))
+
+(defn bounds [node]
+  (select-keys (:env node) [:line :end-line :column :end-column]))
+
+(defn readable [node]
+  (walk-select-keys
+   node
+   [:op :init :methods :body :statements :val :children :bindings :test :then :else :keyword :target :form
+    :args :name :ret :method :params :variadic? :fixed-arity]))
 
 (comment
 
@@ -172,4 +188,91 @@
      :init {:op :const, :val 7},
      :children [:init],
      :name b__#0}]}
+
+  
+  
+  (def a (refactor-nrepl.analyzer/ns-ast (slurp "s:/devel/positano/src/positano/reflect.clj"))) ;;this is how clj-refactor does it
+
+  ;;it ultimately calls this, but with a no-op for macroexpansion (TODO: look into this)
+  (def b
+    (clojure.tools.analyzer.jvm/analyze-ns 'positano.reflect)) 
+
+  ;;lets try "without" macroexpansion
+  (defn noop-macroexpand-1 [form] form)
+  (def c
+    (binding [clojure.tools.analyzer/macroexpand-1 noop-macroexpand-1]
+      (clojure.tools.analyzer.jvm/analyze-ns 'positano.reflect)))
+
+  ;;compare the two (excluding the unique parts). They are the same!
+  (def dd (clojure.data/diff
+           (walk-dissoc (nth b 2) [:loop-id :atom])
+           (walk-dissoc (nth c 2) [:loop-id :atom])))
+
+  (-> b
+      (nth 1)
+      (walk-select-keys
+       [:op :init :methods :body :statements :val :children :bindings :test :then :else
+        :args :name :ret :method :params :variadic? :fixed-arity]) clojure.pprint/pprint)
+  
+  (->> (second b)
+       ast/nodes
+       (filter #(and (#{:local :binding} (:op %))
+                     (:local %)))
+       (map (fn [x] {:name (:name x)
+                     :form (:form x)
+                     :line (-> x :env :line)}))
+       pprint)
+
+  (->> (second b)
+       ast/nodes
+       (filter #(and (#{;;:local
+                        :binding} (:op %))
+                     (= "var" (-> % :form str))
+                     (:local %)))
+       (map (fn [x] {:name (:name x)
+                     :form (:form x)
+                     :line (-> x :env :line)
+                     :init (readable (:init x))
+                     :op (:op x)
+                     :bounds (bounds x)
+                     }))
+       pprint)
+  
+  ;;out:
+
+  ({:name var__#0,
+    :form var,
+    :line 8,
+    :init
+    {:op :invoke,
+     :children [:fn :args],
+     :form (resolve fun),
+     :args
+     [{:op :local,
+       :children [],
+       :form fun,
+       :name fun__#0,
+       :variadic? false}]},
+    :op :binding,
+    :bounds {:line 8, :end-line 8, :column 9, :end-column 12}})
+
+  ;;if you replace (resolve fun) with (:h fun)
+  
+  ({:name var__#0,
+    :form var,
+    :line 8,
+    :init
+    {:op :keyword-invoke,
+     :children [:keyword :target],
+     :keyword {:op :const, :val :h, :form :h},
+     :target
+     {:op :local,
+      :children [],
+      :form fun,
+      :name fun__#0,
+      :variadic? false},
+     :form (:h fun)},
+    :op :binding,
+    :bounds {:line 8, :end-line 8, :column 9, :end-column 12}})
+
   )
