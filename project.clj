@@ -11,5 +11,6 @@
   :pedantic? :abort
   
   :profiles {:dev {:source-paths ["dev"]
-                   :dependencies [[org.clojure/tools.namespace "0.2.11"]]}})
+                   :dependencies [[org.clojure/tools.namespace "0.2.11"]
+                                  [fipp "0.6.2"]]}})
 
