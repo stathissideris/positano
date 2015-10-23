@@ -1,9 +1,9 @@
->(ns positano.analyze
+(ns positano.analyze
   (:require [clojure.walk :as walk]
             [clojure.tools.analyzer.jvm :as ana]
             [clojure.tools.analyzer.passes.jvm.emit-form :as e]
             [clojure.tools.analyzer.ast :as ast]
-            [clojure.pprint :refer [pprint]]))
+            [print :refer [smart-pprint weight]]))
 
 (defn walk-select-keys [m ks]
   (walk/prewalk
@@ -23,6 +23,14 @@
    node
    [:op :init :methods :body :statements :val :children :bindings :test :then :else :keyword :target :form
     :args :name :ret :method :params :variadic? :fixed-arity]))
+
+(defn pp [x]
+  (smart-pprint
+   x
+   {:map-first   [:op :name :tag :o-tag :arglists :form :raw-forms]
+    :sort-map-fn (partial sort-by (comp weight val))
+    :map-last    [:init :statements :ret]
+    :map-dissoc  [:env :children :loop-id :meta]}))
 
 (comment
 

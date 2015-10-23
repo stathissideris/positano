@@ -4,18 +4,33 @@
             [fipp.ednize :refer [edn]]
             [fipp.engine :refer [pprint-document]]))
 
-(defn- key-order [m map-first map-last sort-map-keys?]
+(defn weight [x]
+  (cond (map? x) (+ 5 (count x))
+        (sequential? x) (+ 4 (count x))
+        (string? x) 3
+        (keyword x) 3
+        (var? x) 3
+        (instance? Boolean x) 3
+        (number? x) 1
+        :else 2))
+
+(defn- key-order
+  "If not nil, sort-map-fn is passed key-value pairs and is expected
+  to return the pairs in the order they should be used for the
+  \"middle\" part of the map, (middle keys are the ones not mentioned
+  in map-first and map-last)"
+  [m map-first map-last sort-map-fn]
   (let [k          (set (keys m))
         map-middle (set/difference k (set map-first) (set map-last))]
     (remove
      nil?
      (concat (map k map-first)
-             (if sort-map-keys?
-               (sort map-middle)
+             (if sort-map-fn
+               (map first (sort-map-fn (zipmap map-middle (map m map-middle))))
                map-middle)
              (map k map-last)))))
 
-(defrecord EdnPrinter [print-meta map-first map-last sort-map-keys?]
+(defrecord EdnPrinter [print-meta map-first map-last sort-map-fn map-dissoc]
 
   fipp.visit/IVisitor
 
@@ -50,9 +65,9 @@
     [:group "[" [:align (interpose :line (map #(visit this %) x))] "]"])
 
   (visit-map [this x]
-    (let [kvps (for [key (key-order x map-first map-last sort-map-keys?)]
+    (let [kvps (for [key (key-order (apply dissoc x map-dissoc) map-first map-last sort-map-fn)]
                  [:span (visit this key) " " (visit this (get x key))])]
-      [:group "{" [:align (interpose [:span "," :line] kvps)]  "}"]))
+      [:group "{" [:align (interpose :line kvps)]  "}"]))
 
   (visit-set [this x]
     [:group "#{" [:align (interpose :line (map #(visit this %) x)) ] "}"])
@@ -75,16 +90,16 @@
   (visit-pattern [this x]
     [:text (pr-str x)]))
 
-(defn pprint-analyze
-  ([x] (pprint-analyze x {}))
+(defn smart-pprint
+  ([x] (smart-pprint x {}))
   ([x options]
    (let [printer (map->EdnPrinter (merge {:print-meta *print-meta*} options))]
      (binding [*print-meta* false]
        (pprint-document (visit printer x) options)))))
 
 (comment
-  (pprint-analyze
-   {:tag :foo :a 1 :b 2 :env {} :c 3 :attrs [1 2 3 4]}
-   {:map-first      [:attrs]
-    :map-last       [:tag :env]
-    :sort-map-keys? true}))
+  (smart-pprint
+   {:tag :foo :a 3 :b 2 :env {} :c 1 :attrs [1 2 3 4]}
+   {:map-first   [:attrs]
+    :map-last    [:tag :env]
+    :sort-map-fn (partial sort-by val)}))
