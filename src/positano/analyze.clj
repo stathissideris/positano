@@ -1,45 +1,47 @@
 (ns positano.analyze
-  (:require [clojure.walk :as walk]
-            [clojure.tools.analyzer.jvm :as ana]
+  (:require [clojure.tools.analyzer.jvm :as ana]
             [clojure.tools.analyzer.passes.jvm.emit-form :as e]
             [clojure.tools.analyzer.ast :as ast]
+            [clojure.set :as set]
             [print :refer [smart-pprint weight]]))
-
-(defn walk-select-keys [m ks]
-  (walk/prewalk
-   (fn [x] (if-not (map? x) x
-                   (select-keys x ks))) m))
-
-(defn walk-dissoc [m ks]
-  (walk/prewalk
-   (fn [x] (if-not (map? x) x
-                   (apply dissoc x ks))) m))
 
 (defn bounds [node]
   (select-keys (:env node) [:line :end-line :column :end-column]))
 
-(defn readable [node]
-  (walk-select-keys
-   node
-   [:op :init :methods :body :statements :val :children :bindings :test :then :else :keyword :target :form
-    :args :name :ret :method :params :variadic? :fixed-arity]))
-
 (defn pp [x]
   (smart-pprint
    x
-   {:map-first   [:op :name :tag :o-tag :arglists :form :raw-forms]
+   {:map-first   [:op :name :tag :o-tag :arglists :form :raw-forms :children]
     :sort-map-fn (partial sort-by (comp weight val))
     :map-last    [:init :statements :ret]
-    :map-dissoc  [:env :children :loop-id :meta]}))
+    :map-dissoc  [:env :loop-id :meta]}))
+
+(def key-renames
+  {:methods    :method
+   :params     :param
+   :args       :arg
+   :statements :statement})
+
+(def key-dissoc
+  [:children])
+
+(def single-ref
+  {:db/valueType :db.type/ref})
+
+(def many-ref
+  {:db/valueType   :db.type/ref
+   :db/cardinality :db.cardinality/many})
+
+(def schema
+  {:method    many-ref
+   :param     many-ref
+   :arg       many-ref
+   :statement many-ref
+   :ret       single-ref
+   :body      single-ref})
 
 (comment
 
-  ;;keys to follow:
-  ;;{:op :fn-method :body ... :params [...]}
-  ;;{:op :do :statements [...]}
-  ;;{:op :static-call :args [{:op :local :name x__#0} {:op :const :val 1}] :method add}
-  ;;{:op :let, :body ... :bindings [...]}
-  
   (def xx
     (ana/analyze
      '(defn foo
