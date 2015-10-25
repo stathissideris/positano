@@ -3,6 +3,7 @@
             [clojure.tools.analyzer.passes.jvm.emit-form :as e]
             [clojure.tools.analyzer.ast :as ast]
             [clojure.set :as set]
+            [clojure.zip :as zip]
             [print :refer [smart-pprint weight]]))
 
 (defn bounds [node]
@@ -20,7 +21,8 @@
   {:methods    :method
    :params     :param
    :args       :arg
-   :statements :statement})
+   :statements :statement
+   :bindings   :binding})
 
 (def key-dissoc
   [:children])
@@ -32,13 +34,37 @@
   {:db/valueType   :db.type/ref
    :db/cardinality :db.cardinality/many})
 
+(defn generic-zipper
+  "Walks vectors, lists, maps, and maps' keys and values
+  individually. Take care not to replace a keypair with a single
+  value (will throw an exception)."
+  [x]
+  (zip/zipper
+   (some-fn sequential? map?)
+   seq
+   (fn [node children]
+     (cond (vector? node) (vec children)
+           (seq? node) (seq children)
+           (map? node) (into {} children)))
+   x))
+
+(defn- dump-zipper [z]
+  (loop [z z]
+    (prn (zip/node z))
+    (if-not (zip/end? z) (recur (zip/next z)))))
+
+(defn to-transaction [x]
+  ())
+
 (def schema
   {:method    many-ref
    :param     many-ref
    :arg       many-ref
    :statement many-ref
+   :binding   many-ref
    :ret       single-ref
-   :body      single-ref})
+   :body      single-ref
+   :init      single-ref})
 
 (comment
 
