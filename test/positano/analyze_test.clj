@@ -12,6 +12,11 @@
     (is (= [1 2 :new 3 4]
            (-> x generic-zipper zip/next zip/next zip/next (zip/replace :new) zip/root)))
 
+    (let [replace (fn [zipper]
+                    (as-> (zip/node zipper) x))]
+     (is (= [1 2 :new 3 4]
+            (-> x generic-zipper zip/next zip/next zip/next replace zip/root))))
+
     ;;dive in and just go back to the root
     (is (= x (-> x generic-zipper zip/next zip/next zip/next zip/root)))
 

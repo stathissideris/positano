@@ -1,18 +1,20 @@
 (ns positano.analyze
-  (:require [clojure.tools.analyzer.jvm :as ana]
-            [clojure.tools.analyzer.passes.jvm.emit-form :as e]
+  (:require [clojure.set :as set]
             [clojure.tools.analyzer.ast :as ast]
+            [clojure.tools.analyzer.jvm :as ana]
+            [clojure.tools.analyzer.passes.jvm.emit-form :as e]
             [clojure.set :as set]
             [clojure.zip :as zip]
             [print :refer [smart-pprint weight]]))
 
 (defn bounds [node]
-  (select-keys (:env node) [:line :end-line :column :end-column]))
+  (when-let [env (:env node)]
+    (select-keys env [:line :end-line :column :end-column])))
 
 (defn pp [x]
   (smart-pprint
    x
-   {:map-first   [:op :name :tag :o-tag :arglists :form :raw-forms :children]
+   {:map-first   [:op :name :tag :o-tag :arglists :form :raw-forms :children :bounds]
     :sort-map-fn (partial sort-by (comp weight val))
     :map-last    [:init :statements :ret]
     :map-dissoc  [:env :loop-id :meta]}))
@@ -25,7 +27,9 @@
    :bindings   :binding})
 
 (def key-dissoc
-  [:children])
+  [:children :meta :loop-id :env :tag :o-tag
+   :once :variadic? :max-fixed-arity :validated? :type :assignable?
+   :body?])
 
 (def single-ref
   {:db/valueType :db.type/ref})
@@ -53,8 +57,23 @@
     (prn (zip/node z))
     (if-not (zip/end? z) (recur (zip/next z)))))
 
+(defn- replace-node [zipper]
+  (let [node (zip/node zipper)]
+    (if-not (map? node)
+      zipper
+      (zip/replace
+       zipper
+       (as-> node x
+         (if-not (:env x) x (assoc x :bounds (bounds node)))
+         (apply dissoc x key-dissoc)
+         (set/rename-keys x key-renames)
+         )))))
+
 (defn to-transaction [x]
-  ())
+  (loop [zipper (generic-zipper x)]
+    (if (zip/end? zipper)
+      (zip/root zipper)
+      (recur (zip/next (replace-node zipper))))))
 
 (def schema
   {:method    many-ref
@@ -77,6 +96,17 @@
          (+ x 1)
          (* x 2)))))
 
+  (->
+   '(defn foo
+      "I don't do a whole lot."
+      ([] 0)
+      ([x]
+       (+ x 1)
+       (* x 2)))
+   ana/analyze
+   to-transaction
+   pp)
+  
   (-> (walk-select-keys
        xx
        [:op :init :methods :body :statements :val :args :name :ret :method :params])
