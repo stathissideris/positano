@@ -38,6 +38,9 @@
   {:db/valueType   :db.type/ref
    :db/cardinality :db.cardinality/many})
 
+(defn map-entry? [x]
+  (instance? clojure.lang.MapEntry x))
+
 (defn generic-zipper
   "Walks vectors, lists, maps, and maps' keys and values
   individually. Take care not to replace a keypair with a single
@@ -57,6 +60,13 @@
     (prn (zip/node z))
     (if-not (zip/end? z) (recur (zip/next z)))))
 
+(defn- within-vector? [zipper]
+  (let [parent-node (some-> zipper zip/up zip/node)]
+    (and (not (map-entry? parent-node)) (vector? parent-node))))
+
+(defn- left-index [zipper]
+  (or (some-> zipper zip/left zip/node :pos/index inc) 0))
+
 (defn- replace-node [zipper]
   (let [node (zip/node zipper)]
     (if-not (map? node)
@@ -65,6 +75,7 @@
        zipper
        (as-> node x
          (if-not (:env x) x (assoc x :bounds (bounds node)))
+         (if-not (within-vector? zipper) x (assoc x :pos/index (left-index zipper)))
          (apply dissoc x key-dissoc)
          (set/rename-keys x key-renames)
          )))))
