@@ -1,7 +1,9 @@
 (ns positano.analyze-test
   (:require [clojure.test :refer :all]
             [positano.analyze :refer :all]
-            [clojure.zip :as zip]))
+            [clojure.tools.analyzer.jvm :as ana]
+            [clojure.zip :as zip]
+            [datascript.core :as d]))
 
 (defn nexts [zipper times]
   (last (take (inc times) (iterate zip/next zipper))))
@@ -30,3 +32,12 @@
                (nexts 8) (zip/replace :new-key) ;;replace key
                (nexts 2) (zip/replace [:new-key2 100]) ;;replace key-pair
                zip/root)))))
+
+(deftest transact-analyze-output
+  (let [process (fn [form] (->> form ana/analyze to-transaction (d/transact (d/create-conn))))]
+    (is (process '(defn foo#
+                    "I don't do a whole lot."
+                    ([] 0)
+                    ([x]
+                     (+ x 1)
+                     (* x 2)))))))

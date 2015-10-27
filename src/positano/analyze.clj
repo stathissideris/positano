@@ -5,6 +5,7 @@
             [clojure.tools.analyzer.passes.jvm.emit-form :as e]
             [clojure.set :as set]
             [clojure.zip :as zip]
+            [datascript.core :as d]
             [print :refer [smart-pprint weight]]))
 
 (defn bounds [node]
@@ -83,7 +84,7 @@
 (defn to-transaction [x]
   (loop [zipper (generic-zipper x)]
     (if (zip/end? zipper)
-      (zip/root zipper)
+      [(zip/root zipper)]
       (recur (zip/next (replace-node zipper))))))
 
 (def schema
