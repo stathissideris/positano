@@ -16,7 +16,7 @@
    x
    {:map-first   [:op :name :tag :o-tag :arglists :form :raw-forms :children :bounds]
     :sort-map-fn (partial sort-by (comp weight val))
-    :map-last    [:init :statements :ret]
+    :map-last    [:init :statements :ret :arg :args]
     :map-dissoc  [:env :loop-id :meta]}))
 
 (def key-renames
@@ -27,7 +27,7 @@
    :bindings   :binding})
 
 (def key-dissoc
-  [:children :meta :loop-id :env :tag :o-tag
+  [:children :meta :loop-id :env :tag :o-tag :return-tag
    :once :variadic? :max-fixed-arity :validated? :type :assignable?
    :body?])
 
@@ -96,6 +96,25 @@
    :body      single-ref
    :init      single-ref})
 
+;;rules:
+
+;;when macros are involved, there is a raw-forms key in the map
+
+;;defs:
+;; :op :def, :name a, :var #'positano.analyze/a, :init { ... }
+
+;;values:
+;; :op :const, :form [1 2 3], :literal? true, :val [1 2 3]
+;; :op :local, :name baz__#0 :form baz, :local :let
+;; :op :var, :var #'positano.analyze/bar, :form :bar
+
+;;calls can be:
+;; :op :static-call, :class clojure.lang.Numbers, :method add
+;; :op :invoke, :fn {:op :var, :var #'positano.analyze/bar, :form :bar} <- def'ed function
+;; :op :invoke, :fn {:op :local, :name baz__#0 :form baz, :local :let}  <- function in a let
+;; :op :invoke, :fn {:op :fn, :methods ...}                             <- in-place function
+;; :op :invoke, :fn {:op :the-var :var #'positano.analyze/bar}          <- (#'bar x)
+;; :op :instance-call, :class java.lang.String, :method length, :instance { ... } <- (.length "abc")
 (comment
 
   (def xx
@@ -114,6 +133,19 @@
       ([x]
        (+ x 1)
        (* x 2)))
+   ana/analyze
+   to-transaction
+   pp)
+
+  (->
+   '(do
+      (defn bar [x] (+ x 7))
+      (defn foo
+        "I don't do a whole lot."
+        ([] 0)
+        ([x]
+         (+ (bar x) 1)
+         (* x 2))))
    ana/analyze
    to-transaction
    pp)
