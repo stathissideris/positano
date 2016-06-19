@@ -8,65 +8,57 @@
 
 (def event-sequence (atom 0))
 
-(def db-uri-base "datomic:mem://")
+(def one {:db/cardinality :db.cardinality/one})
+(def one-ref {:db/valueType   :db.type/ref
+              :db/cardinality :db.cardinality/one})
+
+(def many-ref {:db/valueType   :db.type/ref
+               :db/cardinality :db.cardinality/many})
 
 (def schema
-  {:event/type
-   {:db/cardinality :db.cardinality/one
-    :db/index       true}
-     
+  {:event/type         one
+
    :event/id
    {:db/cardinality :db.cardinality/one
-    :db/index       true
     :db/unique      :db.unique/identity}
-     
-   :event/timestamp
-   {:db/cardinality :db.cardinality/one
-    :db/index       true}
-     
-   :event/fn-name
-   {:db/cardinality :db.cardinality/one
-    :db/index       true}
-     
-   :event/ns
-   {:db/cardinality :db.cardinality/one
-    :db/index       true}
-     
-   :event/thread
-   {:db/cardinality :db.cardinality/one
-    :db/index       true}
-     
-   :event/return-value
-   {:db/cardinality :db.cardinality/one}
-     
-   :event/sequence
-   {:db/cardinality :db.cardinality/one}
+
+   :event/timestamp    one
+   :event/fn-name      one
+   :event/ns           one
+   :event/thread       one
+   :event/return-value one
+   :event/sequence     one
 
    ;;refs
-   :event/fn-entry
-   {:db/valueType   :db.type/ref
-    :db/cardinality :db.cardinality/one}
-     
-   :event/fn-return
-   {:db/valueType   :db.type/ref
-    :db/cardinality :db.cardinality/one}
-     
-   :event/fn-caller
-   {:db/valueType   :db.type/ref
-    :db/cardinality :db.cardinality/one}
-     
+   :event/fn-entry     one-ref
+   :event/fn-return    one-ref
+   :event/fn-caller    one-ref
+
    ;;fn args
    :event/fn-args
    {:db/valueType   :db.type/ref
     :db/isComponent true
     :db/cardinality :db.cardinality/many}
-     
-   :fn-arg/value
-   {:db/cardinality :db.cardinality/one}
-     
-   :fn-arg/position
-   {:db/cardinality :db.cardinality/one
-    }})
+
+   :fn-arg/value       one
+   :fn-arg/position    one
+
+   ;;TODO prefix these with analyze/
+   :expr               one-ref
+   :init               one-ref
+   :statements         many-ref
+   :args               many-ref
+   :bindings           many-ref
+   :meta               one-ref
+   :env                one-ref
+   :test               one-ref
+   :then               one-ref
+   :else               one-ref
+   ;;:val                one
+   ;;:var                one
+   :fn                 one-ref
+   ;;:val one-ref
+   })
 
 (defn destroy-db! [uri]
   ;;TODO delete database here?
@@ -156,7 +148,7 @@
   (def ch (event-channel conn))
 
   (async/>!! ch {:type :fn-call :id "t999" :fn-name "function-name" :ns "positano.core" :args [1 2 3] :timestamp (java.util.Date.)})
-  
+
   @(d/transact
     conn
     [{:db/id           -1
@@ -167,11 +159,11 @@
       :event/ns        "positano.core"
       :event/fn-args   [{:fn-arg/position 0 :fn-arg/value "9"}
                         {:fn-arg/position 1 :fn-arg/value "[1 2]"}]}])
-  
+
   ;;;;
 
   (def db (d/db conn))
-  
+
   (def q-result
     (d/q '[:find ?e .
            :where [?e :event/id "t999"]]

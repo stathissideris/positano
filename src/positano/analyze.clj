@@ -1,9 +1,37 @@
->(ns positano.analyze
+(ns positano.analyze
   (:require [clojure.walk :as walk]
             [clojure.tools.analyzer.jvm :as ana]
             [clojure.tools.analyzer.passes.jvm.emit-form :as e]
             [clojure.tools.analyzer.ast :as ast]
-            [clojure.pprint :refer [pprint]]))
+            [clojure.pprint :refer [pprint]]
+            [datascript.core :as d]
+            [positano.core :as core])
+  (:import [java.io File]))
+
+(def query-rules
+  '[[(def ?def ?name)
+     [?def :op :def]
+     [?def :name ?name]]
+
+    [(top-level-fn ?def ?name)
+     (def ?def ?name)
+     [?def :init ?with-meta]
+     [?with-meta :op :with-meta]
+     [?with-meta :expr ?fn]
+     [?fn :op :fn]]
+
+    [(ns ?def ?ns)
+     [?def :env ?env]
+     [?env :ns ?ns]]
+
+    [(invoke-var ?var)
+     [?invoke :op :invoke]
+     [?invoke :fn ?fn]
+     [?fn :op :var]
+     [?fn :var ?var]]
+
+    [(env ?form ?env)
+     [?form :env ?env]]])
 
 (defn walk-select-keys [m ks]
   (walk/prewalk
@@ -20,9 +48,31 @@
 
 (defn readable [node]
   (walk-select-keys
+
    node
    [:op :init :methods :body :statements :val :children :bindings :test :then :else :keyword :target :form
-    :args :name :ret :method :params :variadic? :fixed-arity]))
+    :args :name :ret :method :params :variadic? :fixed-arity :expr
+    :meta :fn :private :var
+    :env :ns :file :line :end-line :column :end-column
+    ]))
+
+(defn replace-nils [m replacement]
+  (walk/prewalk (fn [x] (if (nil? x) replacement x)) m))
+
+(defn resolve-vars
+  "Replaces (var x) with the resolved var in the passed datalog query."
+  [query]
+  (walk/prewalk (fn [x] (if (and (list? x)
+                                 (= 'var (first x)))
+                          (resolve (second x))
+                          x)) query))
+
+(defn analyze-dir! [conn dir]
+  (doseq [f (file-seq (File. dir))]
+    (when-not (.isDirectory f) ;;maybe check extension too
+      (println "Analyzing" (.getPath f))
+      (let [ast (refactor-nrepl.analyzer/ns-ast (slurp f))]
+        (d/transact! conn (-> ast readable (replace-nils ::nil)))))))
 
 (comment
 
@@ -31,7 +81,7 @@
   ;;{:op :do :statements [...]}
   ;;{:op :static-call :args [{:op :local :name x__#0} {:op :const :val 1}] :method add}
   ;;{:op :let, :body ... :bindings [...]}
-  
+
   (def xx
     (ana/analyze
      '(defn foo
@@ -102,7 +152,7 @@
         :args :name :ret :method :params :variadic? :fixed-arity])
       clojure.pprint/pprint)
 
-  
+
   {:op :def
    :name 'foo
    :top-level true
@@ -189,13 +239,13 @@
      :children [:init],
      :name b__#0}]}
 
-  
-  
-  (def a (refactor-nrepl.analyzer/ns-ast (slurp "s:/devel/positano/src/positano/reflect.clj"))) ;;this is how clj-refactor does it
+
+
+  (def a (refactor-nrepl.analyzer/ns-ast (slurp "src/positano/reflect.clj"))) ;;this is how clj-refactor does it
 
   ;;it ultimately calls this, but with a no-op for macroexpansion (TODO: look into this)
   (def b
-    (clojure.tools.analyzer.jvm/analyze-ns 'positano.reflect)) 
+    (clojure.tools.analyzer.jvm/analyze-ns 'positano.reflect))
 
   ;;lets try "without" macroexpansion
   (defn noop-macroexpand-1 [form] form)
@@ -213,7 +263,7 @@
       (walk-select-keys
        [:op :init :methods :body :statements :val :children :bindings :test :then :else
         :args :name :ret :method :params :variadic? :fixed-arity]) clojure.pprint/pprint)
-  
+
   (->> (second b)
        ast/nodes
        (filter #(and (#{:local :binding} (:op %))
@@ -237,7 +287,7 @@
                      :bounds (bounds x)
                      }))
        pprint)
-  
+
   ;;out:
 
   ({:name var__#0,
@@ -256,23 +306,80 @@
     :op :binding,
     :bounds {:line 8, :end-line 8, :column 9, :end-column 12}})
 
-  ;;if you replace (resolve fun) with (:h fun)
-  
-  ({:name var__#0,
-    :form var,
-    :line 8,
-    :init
-    {:op :keyword-invoke,
-     :children [:keyword :target],
-     :keyword {:op :const, :val :h, :form :h},
-     :target
-     {:op :local,
-      :children [],
-      :form fun,
-      :name fun__#0,
-      :variadic? false},
-     :form (:h fun)},
-    :op :binding,
-    :bounds {:line 8, :end-line 8, :column 9, :end-column 12}})
 
-  )
+
+
+  (def b
+    (clojure.tools.analyzer.jvm/analyze-ns 'positano.reflect))
+  ;;or
+  (def b (refactor-nrepl.analyzer/ns-ast (slurp "src/positano/reflect.clj")))
+
+  (-> b
+      readable
+      (replace-nils ::nil)
+      pprint)
+
+  ;;;;;;;;;;;;;;;;;;;; START HERE ;;;;;;;;;;;;;;;;;;;;;;;;
+
+  (def conn (core/init-db!))
+  (analyze-dir! conn "src")
+
+  ;;top level defs
+  (def res
+    (d/q
+     '[:find ?ns ?name
+       :in $ %
+       :where
+       (def ?def ?name)
+       (ns ?def ?ns)]
+     @conn
+     query-rules))
+
+  ;;top level functions
+  (def res
+    (d/q '[:find ?ns ?name
+           :in $ %
+           :where
+           (top-level-fn ?def ?name)
+           (ns ?def ?ns)]
+         @conn
+         query-rules))
+
+  ;;top level private functions? TODO
+  (def res
+    (d/q '[:find ?name ?meta-val
+           :where
+           [?def :name ?name]
+           [?def :op :def]
+           [?def :meta ?meta]
+           [?meta :val ?meta-val]
+           [?meta-val :private ?pr] ;;TODO
+           [?def :init ?with-meta]
+
+           [?with-meta :op :with-meta]
+           [?with-meta :expr ?fn]
+
+           [?fn :op :fn]]
+         @conn))
+
+  ;;top level memoized functions
+  (def res
+    (d/q '[:find ?ns ?name
+           :in $ %
+           :where
+           [?def :name ?name]
+           [?def :op :def]
+           [?def :init ?memoize]
+
+           [?memoize :op :invoke]
+           [?memoize :fn ?memoize-fn]
+           ;;[?memoize-fn :op :var]
+           ;;[?memoize-fn :var #'clojure.core/memoize]
+           [?with-meta :expr ?fn]
+
+           [?fn :op :fn]
+           (ns ?def ?ns)]
+         @conn
+         query-rules))
+
+)
