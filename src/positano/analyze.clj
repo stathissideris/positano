@@ -30,6 +30,11 @@
      [?fn :op :var]
      [?fn :var ?var]]
 
+    [(invoke-local ?fn)
+     [?invoke :op :invoke]
+     [?invoke :fn ?fn]
+     [?fn :op :local]]
+
     [(env ?form ?env)
      [?form :env ?env]]])
 

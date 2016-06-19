@@ -49,16 +49,14 @@
    :statements         many-ref
    :args               many-ref
    :bindings           many-ref
+   :methods            many-ref
    :meta               one-ref
    :env                one-ref
    :test               one-ref
+   :body               one-ref
    :then               one-ref
    :else               one-ref
-   ;;:val                one
-   ;;:var                one
-   :fn                 one-ref
-   ;;:val one-ref
-   })
+   :fn                 one-ref})
 
 (defn destroy-db! [uri]
   ;;TODO delete database here?
