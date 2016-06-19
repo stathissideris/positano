@@ -13,7 +13,7 @@
 (defn analyze [fragment]
   (let [ast (ana/analyze fragment)
         conn (core/init-db!)]
-    (d/transact! conn [(-> ast readable (replace-nils :positano.analyze/nil))])
+    (d/transact! conn [(fix-ast ast)])
     conn))
 
 (deftest test-analyze-fragments
@@ -91,7 +91,7 @@
 (deftest test-analyze
   (let [conn (core/init-db!)]
 
-    ;;(def cc conn)
+    (def cc conn)
 
     (testing "analyze all code"
       (analyze-dir! conn "src"))

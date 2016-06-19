@@ -56,7 +56,8 @@
    :body               one-ref
    :then               one-ref
    :else               one-ref
-   :fn                 one-ref})
+   :fn                 one-ref
+   :meta-val           one-ref})
 
 (defn destroy-db! [uri]
   ;;TODO delete database here?

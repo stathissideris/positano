@@ -20,6 +20,11 @@
      [?with-meta :expr ?fn]
      [?fn :op :fn]]
 
+    [(private ?def)
+     [?def :meta ?meta]
+     [?meta :meta-val ?meta-val]
+     [?meta-val :private true]]
+
     [(ns ?def ?ns)
      [?def :env ?env]
      [?env :ns ?ns]]
@@ -72,12 +77,30 @@
                           (resolve (second x))
                           x)) query))
 
+(defn- rename-key [m k new-k]
+  (if-let [value (get m k)]
+    (-> m (dissoc k) (assoc new-k value))
+    m))
+
+(defn- rename-meta-val [ast]
+  (walk/prewalk
+   (fn [x] (if (and (map? x)
+                    (:meta x))
+             (update x :meta #(rename-key % :val :meta-val))
+             x)) ast))
+
+(defn fix-ast [ast]
+  (-> ast
+      readable
+      rename-meta-val
+      (replace-nils ::nil)))
+
 (defn analyze-dir! [conn dir]
   (doseq [f (file-seq (File. dir))]
     (when-not (.isDirectory f) ;;maybe check extension too
       (println "Analyzing" (.getPath f))
       (let [ast (refactor-nrepl.analyzer/ns-ast (slurp f))]
-        (d/transact! conn (-> ast readable (replace-nils ::nil)))))))
+        (d/transact! conn (fix-ast ast))))))
 
 (comment
 
@@ -350,22 +373,16 @@
          @conn
          query-rules))
 
-  ;;top level private functions? TODO
+  ;;top level private functions?
   (def res
-    (d/q '[:find ?name ?meta-val
+    (d/q '[:find ?ns ?name
+           :in $ %
            :where
-           [?def :name ?name]
-           [?def :op :def]
-           [?def :meta ?meta]
-           [?meta :val ?meta-val]
-           [?meta-val :private ?pr] ;;TODO
-           [?def :init ?with-meta]
-
-           [?with-meta :op :with-meta]
-           [?with-meta :expr ?fn]
-
-           [?fn :op :fn]]
-         @conn))
+           (top-level-fn ?def ?name)
+           (ns ?def ?ns)
+           (private ?def)]
+         @conn
+         query-rules))
 
   ;;top level memoized functions
   (def res
@@ -386,5 +403,15 @@
            (ns ?def ?ns)]
          @conn
          query-rules))
+
+  ;;top-level fns with files and line numbers
+  (pprint
+   (d/q '[:find ?ns ?name (pull ?env [:file :line])
+          :in $ %
+          :where
+          (top-level-fn ?def ?name)
+          (ns ?def ?ns)
+          (?def :env ?env)]
+        @conn query-rules))
 
 )
