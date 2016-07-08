@@ -43,10 +43,20 @@
     [(env ?form ?env)
      [?form :env ?env]]])
 
+(defn- weird-core-async-map? [m]
+  (try
+    (:a m)
+    false
+    (catch Exception e
+      true)))
+
 (defn walk-select-keys [m ks]
   (walk/prewalk
-   (fn [x] (if-not (map? x) x
-                   (select-keys x ks))) m))
+   (fn [x]
+     (cond (not (map? x)) x
+           (weird-core-async-map? x) {}
+           :else (select-keys x ks)))
+   m))
 
 (defn walk-dissoc [m ks]
   (walk/prewalk
@@ -84,10 +94,11 @@
 
 (defn- rename-meta-val [ast]
   (walk/prewalk
-   (fn [x] (if (and (map? x)
-                    (:meta x))
-             (update x :meta #(rename-key % :val :meta-val))
-             x)) ast))
+   (fn [x]
+     (cond (not (map? x)) x
+           (weird-core-async-map? x) {}
+           (:meta x) (update x :meta #(rename-key % :val :meta-val))
+           :else x)) ast))
 
 (defn fix-ast [ast]
   (-> ast
@@ -384,26 +395,6 @@
          @conn
          query-rules))
 
-  ;;top level memoized functions
-  (def res
-    (d/q '[:find ?ns ?name
-           :in $ %
-           :where
-           [?def :name ?name]
-           [?def :op :def]
-           [?def :init ?memoize]
-
-           [?memoize :op :invoke]
-           [?memoize :fn ?memoize-fn]
-           ;;[?memoize-fn :op :var]
-           ;;[?memoize-fn :var #'clojure.core/memoize]
-           [?with-meta :expr ?fn]
-
-           [?fn :op :fn]
-           (ns ?def ?ns)]
-         @conn
-         query-rules))
-
   ;;top-level fns with files and line numbers
   (pprint
    (d/q '[:find ?ns ?name (pull ?env [:file :line])
@@ -413,5 +404,4 @@
           (ns ?def ?ns)
           (?def :env ?env)]
         @conn query-rules))
-
 )
