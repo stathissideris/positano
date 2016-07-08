@@ -82,7 +82,7 @@
     (when (seq (:event/fn-args e))
       {:event/fn-args (map (fn [pos val]
                              {:fn-arg/position pos
-                              :fn-arg/value val})
+                              :fn-arg/value (or val :positano/nil)})
                            (range) (:event/fn-args e))}))])
 
 (defn- return-id->call-id [id]
@@ -97,7 +97,7 @@
       e
       {:db/id -100
        :event/sequence @event-sequence
-       :event/return-value (:event/return-value e)
+       :event/return-value (or (:event/return-value e) :positano/nil)
        :event/fn-entry [:event/id call-event-id]})
      {:db/id [:event/id call-event-id]
       :event/fn-return -100}]))
