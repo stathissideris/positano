@@ -29,13 +29,13 @@
      [?def :env ?env]
      [?env :ns ?ns]]
 
-    [(invoke-var ?var)
+    [(invoke-var ?invoke ?var)
      [?invoke :op :invoke]
      [?invoke :fn ?fn]
      [?fn :op :var]
      [?fn :var ?var]]
 
-    [(invoke-local ?fn)
+    [(invoke-local ?invoke ?fn)
      [?invoke :op :invoke]
      [?invoke :fn ?fn]
      [?fn :op :local]]
