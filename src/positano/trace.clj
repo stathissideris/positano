@@ -310,13 +310,18 @@ affecting the result."
              (throw (ex-info (format "Cannot resolve symbol %s" s) {})))
          ns (.ns v)
          s  (.sym v)]
-     (if (and (ifn? @v) (-> v meta :macro not) (-> v meta ::traced not))
-       (let [f @v
-             vname (symbol (str ns "/" s))]
+     (when-not (ifn? @v)
+       (throw (ex-info (format "Var %s does not resolve to a function" (str v))
+                       {:var   v
+                        :value @v})))
+     (when (-> v meta :macro)
+       (throw (ex-info (format "Var %s points to a macro" (str v)) {:var v})))
+     (when (-> v meta ::traced not)
+       (let [fun @v]
          (doto v
            (alter-var-root #(fn tracing-wrapper [& args]
                               (trace-fn-call s ns % args)))
-           (alter-meta! assoc ::traced f)))))))
+           (alter-meta! assoc ::traced fun)))))))
 
 (defn untrace-var*
   "Reverses the effect of trace-var / trace-vars / trace-ns for the
