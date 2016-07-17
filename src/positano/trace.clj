@@ -118,7 +118,7 @@ affecting the result."
      (trace-forms ~@body)))
 
 ;; Trace the loop form, its bindings then the forms in its body.
-(defmethod trace-special-form 
+(defmethod trace-special-form
   'loop* [[_ bindings & body]]
   `(loop* ~(trace-bindings bindings)
      (trace-forms ~@body)))
@@ -184,13 +184,13 @@ affecting the result."
     (trace-value form)))
 
 (defprotocol ThrowableRecompose
-  "Protocol to isolate trace-form from convoluted throwables that 
+  "Protocol to isolate trace-form from convoluted throwables that
    do not have a constructor with a single string argument.
 
    clone-throwable attempts to clone a throwable with a human readable stack trace
    and message :)
    It must return a throwable of the same class. If not clonable, the original
-   throwable should be returned. At least this will preserve the original 
+   throwable should be returned. At least this will preserve the original
    throwable information.
 
    Cloning should be non-obtrusive hence internal exceptions should be silently
@@ -208,12 +208,12 @@ affecting the result."
 
 (extend-type java.nio.charset.CoderMalfunctionError
   ThrowableRecompose
-  (clone-throwable [this stack-trace args] 
+  (clone-throwable [this stack-trace args]
     (try
       (let [ctor (.getConstructor java.nio.charset.CoderMalfunctionError (into-array [java.lang.Exception]))
             arg (first args)]
         (cond
-          (instance? java.lang.Exception arg)      
+          (instance? java.lang.Exception arg)
           (doto (.newInstance ctor (into-array [arg])) (.setStackTrace stack-trace))
           (string? arg)
           (doto (.newInstance ctor (into-array [(Exception. arg)])) (.setStackTrace stack-trace))
@@ -224,18 +224,18 @@ affecting the result."
 
 ;(extend-type java.io.IOError
 ;  ThrowableRecompose
-;  (clone-throwable [this stack-trace args] 
+;  (clone-throwable [this stack-trace args]
 ;    (try
 ;      (let [ctor (.getConstructor java.io.IOError (into-array [java.lang.Throwable]))
 ;            arg (first args)]
 ;        (cond
 ;          (instance? java.lang.Throwable (first arg))
 ;          (doto (.newInstance ctor (into-array [arg])) (.setStackTrace stack-trace))
-;          
+;
 ;          (string? arg)
 ;          (doto (.newInstance ctor (into-array [(Throwable. arg)])) (.setStackTrace stack-trace))
 ;          :else this))
-;      (catch Exception e# this))))  
+;      (catch Exception e# this))))
 
 (extend-type java.lang.ThreadDeath
   ThrowableRecompose
@@ -243,7 +243,7 @@ affecting the result."
 
 (extend-type java.lang.Throwable
   ThrowableRecompose
-  (clone-throwable [this stack-trace args] 
+  (clone-throwable [this stack-trace args]
     (try
       (let [ctor (.getConstructor (class this) (into-array [java.lang.String]))
             arg (first args)]
@@ -261,7 +261,7 @@ affecting the result."
   ThrowableRecompose
   (ctor-select [this _ _] this)) ;; Obviously something is wrong but the trace should not alter processing
 
-(defn trace-compose-throwable 
+(defn trace-compose-throwable
   "Re-create a new throwable with a composed message from the given throwable
    and the message to be added. The exception stack trace is kept at a minimum."
   [^Throwable throwable ^String message]
@@ -408,7 +408,7 @@ affecting the result."
 (defmacro trace-ns
   "Trace all fns in the given name space."
   [ns]
-  `(trace-ns* ~ns)) 
+  `(trace-ns* ~ns))
 
 (defn untrace-ns*
   "Reverses the effect of trace-var / trace-vars / trace-ns for the
