@@ -9,59 +9,75 @@
 ;; initialise positano
 (def pos (pos/init-db!))
 
-;; analyze all code under src/
-(ana/analyze-dir! pos "src")
-(ana/analyze-dir! pos "test")
+;; analyze all code under src/ and test/
+(do
+  (ana/analyze-dir! pos "src")
+  (ana/analyze-dir! pos "test"))
 
-;; select all top level functions
-(def top
-  (d/q '[:find ?ns ?name
-         :in $ %
-         :where
-         (top-level-fn ?def ?name)
-         (ns ?def ?ns)]
-       @pos
-       ana/query-rules))
+(def ends-with #(.endsWith (str %1) %2))
+(def does-not-end-with (complement ends-with))
+(defn sym= [a b] (= (str a) (str b)))
 
-;;exploring the AST with pull:
-(def private-vars-exposed-for-tests
-  (d/q '[:find ?ns ?name (pull ?init [{:fn [:op :var]} :op {:args [*]}])
-         :in $ %
-         :where
-         (def ?def ?name)
-         (ns ?def ?ns)
-         (?def :init ?init)]
-       @pos
-       ana/query-rules))
+;; select all non-test top level functions for now, this also selects
+;; macros! (see what defmacro expands to)
+(def top-fns
+  (set
+   (d/q '[:find ?ns ?name
+          :in $ % ?does-not-end-with
+          :where
+          (top-level-fn ?def ?name)
+          (ns ?def ?ns)
+          [(?does-not-end-with ?ns "-test")]]
+        @pos
+        ana/query-rules
+        does-not-end-with))) ;;datascript does not support `not` yet
 
 ;;actually getting the list of vars:
 (def private-vars-exposed-for-tests
   (d/q (ana/resolve-vars
         '[:find ?ns ?name ?private-fn
-          :in $ %
+          :in $ % ?ends-with
           :where
           (def ?def ?name)
           (ns ?def ?ns)
+          [(?ends-with ?ns "-test")]
           (?def :init ?invoke)
           (invoke-var ?invoke (var clojure.core/deref))
           (?invoke :args ?arg)
           (?arg :var ?private-fn)])
        @pos
-       ana/query-rules))
+       ana/query-rules
+       ends-with))
 
-(count top)
-(first top)
-(-> (map first top) set sort)
+(defn- var->ns-name-pair [v]
+  [(-> v .ns str symbol)
+   (-> v .sym)])
+
+(def fns-to-instrument
+  (set/union
+   (set/difference
+    top-fns
+    (map (comp var->ns-name-pair last) private-vars-exposed-for-tests))
+   (map (juxt first second) private-vars-exposed-for-tests)))
+
+;; sanity check
+(assert (= (count top-fns)
+           (count fns-to-instrument)))
 
 ;; instrument all top level functions
 
-(doseq [[ns fun] top]
+(doseq [[ns fun] fns-to-instrument]
   (println "tracing" (str ns "/" fun))
-  (trace/trace-var* ns fun))
+  (try
+    (trace/trace-var* ns fun)
+    (catch Exception e
+      (if (= :macro (:type (ex-data e))) ;;TODO rule macros out in the original query
+        (println (.getMessage e))
+        (throw e)))))
 
 ;; run unit tests
 
-(dev/run-all-my-tests) ;;hangs on monitor.analyst.clustering-test
+(dev/run-all-my-tests)
 
 ;; collect all functions that were called
 
@@ -76,45 +92,46 @@
 ;; remove all functions that were called from all top level functions
 
 (def not-called
-  (set/difference (set top) called))
+  (set/difference fns-to-instrument called))
 
-(def vv2
-  [['monitor.analyst.clustering 'group-incidents-for-monitor]
-   ['monitor.analyst.clustering 'find-data-clusters]
-   ['monitor.analyst.clustering 'assign-second-level]
-   ['monitor.analyst.clustering 'get-cluster-leader]
-   ['monitor.analyst.clustering 'row->kv]
-   ['monitor.analyst.clustering 'dod-change]
-   ['monitor.analyst.clustering 'get-winning-dim]
-   ['monitor.analyst.clustering 'select-totals-for-third] ;;;
-   ['monitor.analyst.clustering 'assign-totals]
-   ['monitor.analyst.clustering 'get-matching-leader]
-   ['monitor.analyst.clustering 'assign-third-level]
-   ['monitor.analyst.clustering 'get-matching-row]
-   ['monitor.analyst.clustering 'get-issue-dim-values]
-   ['monitor.analyst.clustering 'assign-total-for-row]
-   ['monitor.analyst.clustering 'issue]
-   ['monitor.analyst.clustering 'total?]
-   ['monitor.analyst.clustering 'assign-first-level]
-   ['monitor.analyst.clustering 'dod-change-relative-to-row]
-   ['monitor.analyst.clustering 'get-cluster-leader-with-totals]
-   ['monitor.analyst.clustering 'totals-in-row]
-   ['monitor.analyst.clustering 'gen-clust-num]
-   ['monitor.analyst.clustering 'get-cluster-issue]
-   ['monitor.analyst.clustering 'all-totals]
-   ['monitor.analyst.clustering 'get-matching-cluster]
-   ['monitor.analyst.clustering 'same-direction]
-   ['monitor.analyst.clustering 'first-not-total-dimension]
-   ['monitor.analyst.clustering 'select-keys-ordered]])
+;; report results
 
-(doseq [[ns s] vv]
-  (println "Tracing:" ns s)
-  (trace/trace-var* ns s)
-  (test/run-tests 'monitor.analyst.clustering-test)
-  ;;(println "Event counter:" (count (pq/all-function-events @pos)))
-  (println "Event counter:" @positano.db/event-counter)
-  (println "Event sequence:" @positano.db/event-sequence))
+(println
+ (format
+  (str "Namespaces: %d\n"
+       "Top level functions: %d\n"
+       "Private functions exposed in tests: %d\n"
+       "Called functions: %d\n"
+       "Not called: %d\n"
+       "Coverage: %.2f%%\n")
 
-(doseq [[ns s] vv]
-  (println "Tracing:" ns s)
-  (trace/trace-var* ns s))
+  (count (set (map first top-fns)))
+  (count top-fns)
+  (count private-vars-exposed-for-tests)
+  (count called)
+  (count not-called)
+  (float
+   (* 100
+      (/ (count called)
+         (count top-fns))))))
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;Outakes
+
+;;exploring the AST with pull:
+(def private-vars-exposed-for-tests
+  (d/q '[:find ?ns ?name (pull ?init [{:fn [:op :var]} :op {:args [*]}])
+         :in $ % ?ends-with
+         :where
+         (def ?def ?name)
+         (ns ?def ?ns)
+         [(?ends-with ?ns "-test")]
+         (?def :init ?init)]
+       @pos
+       ana/query-rules
+       ends-with))
