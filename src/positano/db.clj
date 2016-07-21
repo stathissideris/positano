@@ -47,6 +47,7 @@
    :expr               one-ref
    :init               one-ref
    :statements         many-ref
+   :ret                one-ref
    :args               many-ref
    :bindings           many-ref
    :methods            many-ref

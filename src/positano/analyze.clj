@@ -13,7 +13,25 @@
      [?def :op :def]
      [?def :name ?name]]
 
-    [(top-level-fn ?def ?name)
+    [(top-level-fn-or-macro ?def ?name)
+     (def ?def ?name)
+     [?def :init ?with-meta]
+     [?with-meta :op :with-meta]
+     [?with-meta :expr ?fn]
+     [?fn :op :fn]]
+
+    [(macro ?def ?name)
+     (top-level-fn-or-macro ?def ?name)
+     (?do :statements ?def)
+     (?do :op :do)
+     (?do :statements ?set-macro)
+     (?set-macro :op :instance-call)
+     ;;(?set-macro :method 'setMethod) ;;TODO not possible with symbols
+     ;;TODO also match order when available
+     (?do :ret ?ret)
+     (?ret :op :the-var)]
+
+    [(top-level-fn ?def ?name) ;;TODO fix this to not match macros
      (def ?def ?name)
      [?def :init ?with-meta]
      [?with-meta :op :with-meta]
