@@ -4,7 +4,7 @@
             [clojure.repl :as repl])
   (:require [positano.utils :refer [in-recursive-stack?]]))
 
-(def event-channel (atom nil))
+(defonce event-channel (atom nil))
 
 (def stacks (atom {}))
 
