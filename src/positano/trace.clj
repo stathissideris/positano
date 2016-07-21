@@ -37,7 +37,6 @@ affecting the result."
      value))
 
 (defn record-event [e]
-  ;;TODO check events using prismatic schema here
   (when recording?
     (without-recording
      (when (and @event-channel (not (in-recursive-stack?)))
@@ -312,10 +311,13 @@ affecting the result."
          s  (.sym v)]
      (when-not (ifn? @v)
        (throw (ex-info (format "Var %s does not resolve to a function" (str v))
-                       {:var   v
+                       {:type  :not-a-function
+                        :var   v
                         :value @v})))
      (when (-> v meta :macro)
-       (throw (ex-info (format "Var %s points to a macro" (str v)) {:var v})))
+       (throw (ex-info (format "Var %s points to a macro" (str v))
+                       {:type :macro
+                        :var  v})))
      (when (-> v meta ::traced not)
        (let [fun @v]
          (doto v
