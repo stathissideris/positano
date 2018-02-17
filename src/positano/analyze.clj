@@ -3,6 +3,7 @@
             [clojure.tools.analyzer.jvm :as ana]
             [clojure.tools.analyzer.passes.jvm.emit-form :as e]
             [clojure.tools.analyzer.ast :as ast]
+            [refactor-nrepl.analyzer]
             [clojure.pprint :refer [pprint]]
             [datascript.core :as d]
             [positano.core :as core])
@@ -299,6 +300,8 @@
 
 
   (def a (refactor-nrepl.analyzer/ns-ast (slurp "src/positano/reflect.clj"))) ;;this is how clj-refactor does it
+
+  (def a (refactor-nrepl.analyzer/ns-ast (slurp "/Volumes/work/bsq/vittle-analytics/src/monitor/utils.clj")))
 
   ;;it ultimately calls this, but with a no-op for macroexpansion (TODO: look into this)
   (def b
