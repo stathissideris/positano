@@ -14,4 +14,6 @@
 
   :plugins [[thomasa/mranderson "0.4.7"]]
   :profiles {:dev {:source-paths ["src" "dev"]
-                   :dependencies [[org.clojure/tools.namespace "0.2.11"]]}})
+                   :dependencies [[org.clojure/tools.namespace "0.2.11"]
+                                  [spec-provider "0.4.11"]
+                                  [com.clojure-goes-fast/clj-memory-meter "0.1.0"]]}})
