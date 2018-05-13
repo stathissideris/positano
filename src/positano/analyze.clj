@@ -14,7 +14,8 @@
 (def query-rules
   '[[(def ?def ?name)
      [?def :op :def]
-     [?def :name ?name]]
+     [?def :name ?symbol-name]
+     [(str ?symbol-name) ?name]] ;;because it's harder to query symbols
 
     [(top-level-fn-or-macro ?def ?name)
      (def ?def ?name)
@@ -663,6 +664,52 @@
        (public ?def)]
      ast)))
 
+  (pprint
+   (seq
+    (ast-q
+     '[:find ?op
+       :in $ %
+       :where
+       (def ?def 'flatten-with-maps)
+       [?op :op ?op-type]
+       [?def :chilxd ?op]]
+     ast)))
 
+  (pprint
+   (seq
+    (ast-q
+     '[:find ?def
+       :in $ %
+       :where
+       (def ?def ?name)
+       [(= ?name "flatten-with-maps")]]
+     ast)))
 
+  (pprint
+   (seq
+    (ast-q
+     '[:find ?var
+       :in $ %
+       :where
+       (def ?def ?name)
+       [(= ?name "flatten-with-maps")]
+       [?def :init ?init]
+       [?init :expr ?expr]
+       [?expr :methods ?methods]
+       [?methods :body ?body]
+       [?body :fn ?fn]
+       [?fn :var ?var]]
+     ast)))
+
+  ;;all invoked vars
+  (pprint
+   (seq
+    (ast-q
+     '[:find ?var
+       :in $ %
+       :where
+       [?op :op :invoke]
+       [?op :fn ?fn]
+       [?fn :var ?var]]
+     ast)))
   )
