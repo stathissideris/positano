@@ -66,7 +66,24 @@
      [?fn :op :local]]
 
     [(env ?form ?env)
-     [?form :env ?env]]])
+     [?form :env ?env]]
+
+    [(parent ?parent ?child)
+     [?parent :init ?child]]
+    [(parent ?parent ?child)
+     [?parent :expr ?child]]
+    [(parent ?parent ?child)
+     [?parent :methods ?child]]
+    [(parent ?parent ?child)
+     [?parent :body ?child]]
+    [(parent ?parent ?child)
+     [?parent :args ?child]]
+
+    [(ancestor ?a ?b)
+     [parent ?a ?b]]
+    [(ancestor ?a ?b)
+     [parent ?a ?x]
+     [ancestor ?x ?b]]])
 
 (defn- weird-core-async-map? [m]
   (try
@@ -699,6 +716,30 @@
        [?methods :body ?body]
        [?body :fn ?fn]
        [?fn :var ?var]]
+     ast)))
+
+  (pprint
+   (seq
+    (ast-q
+     '[:find ?child
+       :in $ %
+       :where
+       (def ?def ?name)
+       [(= ?name "flatten-with-maps")]
+       [parent ?def ?child]]
+     ast)))
+
+  ;;all invoked vars in function
+  (pprint
+   (seq
+    (ast-q
+     '[:find ?var
+       :in $ %
+       :where
+       (def ?def ?name)
+       [(= ?name "flatten-with-maps")]
+       [ancestor ?def ?invoke]
+       [invoke-var ?invoke ?var]]
      ast)))
 
   ;;all invoked vars
