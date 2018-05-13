@@ -11,6 +11,8 @@
             [positano.core :as core])
   (:import [java.io File]))
 
+(defn var-name [v] (subs (str v) 2))
+
 (def query-rules
   '[[(def ?def ?name)
      [?def :op :def]
@@ -58,7 +60,8 @@
      [?invoke :op :invoke]
      [?invoke :fn ?fn]
      [?fn :op :var]
-     [?fn :var ?var]]
+     [?fn :var ?raw-var]
+     [(positano.analyze/var-name ?raw-var) ?var]]
 
     [(invoke-local ?invoke ?fn)
      [?invoke :op :invoke]
@@ -83,7 +86,11 @@
      [parent ?a ?b]]
     [(ancestor ?a ?b)
      [parent ?a ?x]
-     [ancestor ?x ?b]]])
+     [ancestor ?x ?b]]
+
+    [(caller ?a ?b)
+     [ancestor ?a ?x]
+     [invoke-var ?x ?b]]])
 
 (defn- weird-core-async-map? [m]
   (try
@@ -741,6 +748,26 @@
        [ancestor ?def ?invoke]
        [invoke-var ?invoke ?var]]
      ast)))
+
+  (pprint
+   (seq
+    (ast-q
+     '[:find ?var
+       :in $ %
+       :where
+       (def ?def ?name)
+       [(= ?name "flatten-with-maps")]
+       [caller ?def ?var]]
+     ast)))
+
+  ;;who calls clojure.core/filter ?
+  (ast-q
+   '[:find ?name
+     :in $ %
+     :where
+     (def ?def ?name)
+     [caller ?def "clojure.core/filter"]]
+   ast)
 
   ;;all invoked vars
   (pprint
