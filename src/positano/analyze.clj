@@ -3,9 +3,11 @@
             [clojure.tools.analyzer.jvm :as ana]
             [clojure.tools.analyzer.passes.jvm.emit-form :as e]
             [clojure.tools.analyzer.ast :as ast]
+            [clojure.tools.analyzer.ast.query :as ast.query]
             [refactor-nrepl.analyzer]
             [clojure.pprint :refer [pprint]]
-            [datascript.core :as d]
+            ;;[datascript.core :as d]
+            [datomic.api :as d]
             [positano.core :as core])
   (:import [java.io File]))
 
@@ -41,8 +43,11 @@
 
     [(private ?def)
      [?def :meta ?meta]
-     [?meta :meta-val ?meta-val]
-     [?meta-val :private true]]
+     [?meta :val ?val]
+     [?val :private true]]
+
+    [(public ?def)
+     (not (private ?def))]
 
     [(ns ?def ?ns)
      [?def :env ?env]
@@ -130,7 +135,62 @@
     (when-not (.isDirectory f) ;;maybe check extension too
       (println "Analyzing" (.getPath f))
       (let [ast (refactor-nrepl.analyzer/ns-ast (slurp f))]
-        (d/transact! conn (fix-ast ast))))))
+        (d/transact conn (fix-ast ast))))))
+
+(defn ast-q [q ast]
+    (d/q q (db ast) query-rules))
+
+(defn ast->eav
+  "Returns an EAV representation of the current AST that can be used by
+   Datomic's Datalog. Produces too much data."
+  [ast]
+  (mapcat (fn [[k v]]
+            (if (#{:form :arglists :raw-forms} k)
+              []
+              (cond (map? v)
+                    (into [[ast k v]] (ast->eav v))
+                    (coll? v)
+                    (mapcat (fn [v]
+                              (if-not (coll? v)
+                                [[ast k v]]
+                                (into [[ast k v]] (ast->eav v)))) v)
+                    :else [[ast k v]])))
+          ast))
+
+(defn ast->eav*
+  "Returns an EAV representation of the current AST that can be used
+  by Datomic's Datalog. Produces double the tuples in comparison to
+  ast.query/db."
+  [ast parent]
+  (let [children (set (:children ast))]
+    (mapcat (fn [[k v]]
+              (if (or (#{:env :meta} k)
+                      (and (= parent :meta) (= k :val))
+                      (children k))
+                (if (map? v)
+                  (into [[ast k v]] (ast->eav* v k))
+                  (mapcat (fn [v] (into [[ast k v]] (ast->eav* v k))) v))
+                [[ast k v]]))
+            ast)))
+
+(defn ast->eav
+  [ast]
+  (ast->eav* ast nil))
+
+(comment
+  (db [{:op 100
+        :children [:foo :bar :baz]
+        :else {:foo 20}
+        :other [{:bar 40}
+                {:zoo 102}]}]))
+
+(defn db
+  "Given a list of ASTs, returns a representation of those
+   that can be used as a database in a Datomic Datalog query"
+  [asts]
+  (mapcat ast->eav asts))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (comment
 
@@ -298,9 +358,43 @@
      :name b__#0}]}
 
 
+  (defn mini
+  ([data]
+   (mini data 5))
+  ([data max-len]
+   (walk/prewalk
+    (fn [x]
+      (if (and (sequential? x) (not (map-entry? x)))
+        (if (> (count x) max-len)
+          (into [] (concat (take max-len x) ['... (count x)]))
+          x)
+        x))
+    data)))
 
-  (def a (refactor-nrepl.analyzer/ns-ast (slurp "src/positano/reflect.clj"))) ;;this is how clj-refactor does it
+  (defn add [a b]
+    #dbg
+    (do
+      (println "foo")
+      (println "bar")
+      (println "baz")
+      (* a a b b)))
 
+
+  (def file1 (refactor-nrepl.analyzer/ns-ast (slurp "src/positano/reflect.clj")))
+  (def file2 (refactor-nrepl.analyzer/ns-ast (slurp "src/positano/utils.clj")))
+
+  (require '[spec-provider.provider :as sp])
+  (sp/pprint-specs (sp/infer-specs a ::ast) 'an 's)
+
+  (require '[spec-provider.stats :as stats])
+  (def ss (stats/collect a))
+  (-> (sp/summarize-stats ss ::ast {})
+      (sp/pprint-specs 'positano.analyze 's))
+
+  (require '[clj-memory-meter.core :as mm])
+  (mm/measure ss)
+
+  (def a (refactor-nrepl.analyzer/ns-ast (slurp "src/positano/utils.clj"))) ;;this is how clj-refactor does it
   (def a (refactor-nrepl.analyzer/ns-ast (slurp "/Volumes/work/bsq/vittle-analytics/src/monitor/utils.clj")))
 
   ;;it ultimately calls this, but with a no-op for macroexpansion (TODO: look into this)
@@ -425,4 +519,150 @@
           (ns ?def ?ns)
           (?def :env ?env)]
         @conn query-rules))
-)
+
+;;; datomic
+
+  (def ast
+    (clojure.tools.analyzer.jvm/analyze-ns 'positano.reflect))
+
+  (-> ast ast.query/db first first pprint)
+
+  (ast.query/q
+   '[:find ?ns ?name
+     :in $ %
+     :where
+     (def ?def ?name)
+     (ns ?def ?ns)]
+   ast
+   query-rules)
+
+  (ast.query/q
+   '[:find ?def
+     :in $ %
+     :where
+     [?def :op :def]]
+   ast
+   query-rules)
+
+  (d/q '[:find ?a
+         :in $
+         :where [?m :b ?a]]
+       [[{:a 10 :b 20} :a 10]
+        [{:a 10 :b 20} :b 20]
+        [{:a 11 :b 21} :a 11]
+        [{:a 11 :b 21} :b 21]])
+
+  (ast-query
+   '[:find ?name
+     :in $ %
+     :where
+     (def ?def ?name)]
+   ast)
+
+  (ast-query
+   '[:find ?def
+     :in $ %
+     :where
+     (def ?def ?name)]
+   ast)
+
+  (pprint (first (ast-query
+                  '[:find ?def
+                    :in $ %
+                    :where
+                    (def ?def ?name)]
+                  ast)))
+
+  (pprint
+   (take
+    3
+    (ast-query
+     '[:find ?name
+       :in $ %
+       :where
+       [?def :meta ?meta]
+       [?meta :doc ?name]]
+     ast)))
+
+  (pprint
+   (take
+    3
+    (d/q
+     '[:find ?ns
+       :in $ %
+       :where
+       [?def :meta ?meta]
+       [?meta :ns ?ns]]
+     (db ast)
+     query-rules)))
+
+  (pprint
+   (seq
+    (d/q
+     '[:find ?ns ?name
+       :in $ %
+       :where
+       (def ?def ?name)
+       [?def :env ?env]
+       [?env :ns ?ns]]
+     (db ast)
+     query-rules)))
+
+  (pprint
+   (seq
+    (d/q
+     '[:find ?ns ?name
+       :in $ %
+       :where
+       (def ?def ?name)
+       (ns ?def ?ns)]
+     (db ast)
+     query-rules)))
+
+  (pprint
+   (seq
+    (ast-q
+     '[:find ?ns ?name ?meta
+       :in $ %
+       :where
+       (def ?def ?name)
+       (ns ?def ?ns)
+       (?def :meta ?meta)]
+     ast)))
+
+  (pprint
+   (seq
+    (ast-q
+     '[:find ?ns ?name
+       :in $ %
+       :where
+       (def ?def ?name)
+       (ns ?def ?ns)
+       (private ?def)]
+     ast)))
+
+  (pprint
+   (seq
+    (ast-q
+     '[:find ?ns ?name
+       :in $ %
+       :where
+       (def ?def ?name)
+       (ns ?def ?ns)
+       (not (private ?def))] ;; NEGATION AT LAST
+     ast)))
+
+  (pprint
+   (seq
+    (ast-q
+     '[:find ?ns ?name
+       :in $ %
+       :where
+       (def ?def ?name)
+       (ns ?def ?ns)
+       (public ?def)]
+     ast)))
+
+
+
+  )
