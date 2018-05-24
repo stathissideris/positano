@@ -138,13 +138,6 @@
 (defn ast-q [q ast]
     (d/q q (db ast) query-rules))
 
-(comment
-  (db [{:op 100
-        :children [:foo :bar :baz]
-        :else {:foo 20}
-        :other [{:bar 40}
-                {:zoo 102}]}]))
-
 (defn analyze-dir! [conn dir] ;;TODO fix this function
   (doseq [f (file-seq (File. dir))]
     (when-not (.isDirectory f) ;;maybe check extension too

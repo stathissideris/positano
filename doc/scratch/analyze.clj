@@ -237,3 +237,17 @@
      [?op :fn ?fn]
      [?fn :var ?var]]
    ast)))
+
+;;;;
+;; if you analyze this:
+;; (let [var (resolve fun)] ...)
+
+;; you get something like this:
+{:op :let
+ :bindings [{:form 'x
+             :name 'x__#0
+             :init {:op   :invoke
+                    :fn   {:op  :var
+                           :var #'clojure.core/resolve}
+                    :args [{:op   :local
+                            :form 'fun}]}}]}
