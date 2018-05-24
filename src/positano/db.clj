@@ -5,8 +5,8 @@
             [positano.trace :as trace]))
 
 (def event-counter (atom 0))
-
 (def event-sequence (atom 0))
+(def logged-count (atom 10))
 
 (def one {:db/cardinality :db.cardinality/one})
 (def one-ref {:db/valueType   :db.type/ref
@@ -121,13 +121,18 @@
   somehow transforming the events before sending thme to datomic."
   [conn & [event-transducer]]
   (let [channel           (if event-transducer
-                            (async/chan 1024 event-transducer)
-                            (async/chan 1024))
+                            (async/chan (* 16 1024) event-transducer)
+                            (async/chan (* 16 1024)))
         send-event!       (fn [e]
                             (try
                               @(d/transact conn (to-transactions e))
                               (swap! event-counter inc)
-                              (catch Exception e (println e))))]
+                              (when (zero? (mod @event-counter 100))
+                                (println "---------" @event-counter "events logged"))
+                              (catch Exception e
+                                (when (> @logged-count 0)
+                                  (swap! logged-count dec)
+                                  (println "ERROR:" (.getMessage e))))))]
     (thread
       (trace/without-recording ;;dynamic binding is thread-local so we need to say this once more here
        (loop []

@@ -1,19 +1,20 @@
-(ns positano.analyze.spec)
+(ns positano.analyze.spec
+  (:require [clojure.spec.alpha :as s]))
 
-(s/def ::ns ns?)
+;;(s/def ::ns ns?)
 
 (s/def
  ::tag
  (s/nilable
-  #{clojure.lang.Symbol clojure.lang.Keyword boolean
+  #{clojure.lang.Symbol clojure.lang.Keyword
     clojure.lang.AFunction java.lang.Thread java.lang.Class
     java.lang.Boolean clojure.lang.AReference
     clojure.lang.PersistentVector java.lang.Object
-    int java.lang.Number
-    java.lang.String void java.lang.ClassLoader
+    java.lang.Number
+    java.lang.String java.lang.ClassLoader
     clojure.lang.IPersistentMap clojure.lang.ISeq
     clojure.lang.PersistentArrayMap clojure.lang.Associative
-    java.lang.Long java.util.Date clojure.lang.Var long
+    java.lang.Long java.util.Date clojure.lang.Var
     java.util.concurrent.Callable}))
 
 (s/def
@@ -54,6 +55,11 @@
 (s/def ::in-try boolean)
 (s/def ::added string?)
 (s/def ::catches (s/coll-of any?)) ;;???
+(s/def ::o-tag (s/nilable any?))
+(s/def ::file string?)
+(s/def ::doc string?)
+(s/def ::type #{:number :symbol :string :vector :keyword :class :nil :map})
+
 
 (s/def ::locals
   (s/or :empty (s/and empty? map?)
@@ -73,14 +79,6 @@
                        ::ns]
               :opt-un [::in-try ::loop-id ::loop-locals ::no-recur ::once]))
 
-(s/def ::literal? #{true})
-(s/def ::o-tag (s/nilable any?))
-
-(s/def ::type #{:number :symbol :string :vector :keyword :class :nil :map})
-
-(s/def ::file string?)
-
-(s/def ::doc string?)
 
 (s/def
  ::params
@@ -157,27 +155,28 @@
    ::then
    ::validated?]))
 
-(s/def
- ::val
- (s/nilable
-  (s/or
-   :collection
-   (s/coll-of (s/or :keyword keyword? :symbol symbol?))
-   :map
-   (s/keys
-    :opt-un
-    [::arglists
-     ::column
-     ::doc
-     ::end-column
-     ::end-line
-     ::file
-     ::line
-     ::private
-     ::rettag])
-   :simple
-   #{0 :timed-out 1 :done :else java.lang.Thread "/" clojure.core 3 2
-     positano.utils java.util.Date "$"})))
+(comment
+ (s/def
+   ::val
+   (s/nilable
+    (s/or
+     :collection
+     (s/coll-of (s/or :keyword keyword? :symbol symbol?))
+     :map
+     (s/keys
+      :opt-un
+      [::arglists
+       ::column
+       ::doc
+       ::end-column
+       ::end-line
+       ::file
+       ::line
+       ::private
+       ::rettag])
+     :simple
+     #{0 :timed-out 1 :done :else java.lang.Thread "/" clojure.core 3 2
+       positano.utils java.util.Date "$"}))))
 
 (s/def
  ::vals

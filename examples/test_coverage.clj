@@ -129,9 +129,20 @@
          :in $ % ?ends-with
          :where
          (def ?def ?name)
+         (def ?def 'preprocess-urls)
          (ns ?def ?ns)
          [(?ends-with ?ns "-test")]
          (?def :init ?init)]
        @pos
        ana/query-rules
        ends-with))
+
+(def macros
+  (set
+   (d/q '[:find ?ns ?name
+          :in $ %
+          :where
+          (macro ?def ?name)
+          (ns ?def ?ns)]
+        @pos
+        ana/query-rules)))
