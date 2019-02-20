@@ -7,8 +7,7 @@
             [refactor-nrepl.analyzer]
             [clojure.pprint :refer [pprint]]
             ;;[datascript.core :as d]
-            [datomic.api :as d]
-            [positano.core :as core])
+            [datomic.api :as d])
   (:import [java.io File]))
 
 (defn var-name [v] (subs (str v) 2))
