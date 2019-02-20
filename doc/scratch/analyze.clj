@@ -117,7 +117,7 @@
     :where
     (def ?def ?name)
     [(= ?name "flatten-with-maps")]
-    [parent ?def ?child]]
+    (parent ?def ?child)]
   ast))
 
 ;;all invoked vars in function
@@ -128,8 +128,8 @@
     :where
     (def ?def ?name)
     [(= ?name "flatten-with-maps")]
-    [ancestor ?def ?invoke]
-    [invoke-var ?invoke ?var]]
+    (ancestor ?def ?invoke)
+    (invoke-var ?invoke ?var)]
   ast))
 
 ;;all invoked vars in function
@@ -140,7 +140,7 @@
     :where
     (def ?def ?name)
     [(= ?name "flatten-with-maps")]
-    [caller ?def ?var]]
+    (caller ?def ?var)]
   ast))
 
 ;;who calls clojure.core/filter ?
@@ -150,7 +150,7 @@
     :in $ %
     :where
     (def ?def ?name)
-    [caller ?def "clojure.core/filter"]]
+    (caller ?def "clojure.core/filter")]
   ast))
 
 ;;all invoked vars
