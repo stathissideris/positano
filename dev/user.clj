@@ -3,7 +3,8 @@
 
 (defn load-dev []
   (require 'dev)
-  (in-ns 'dev))
+  (in-ns 'dev)
+  nil)
 
 (def dev load-dev)
 
