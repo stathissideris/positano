@@ -1,7 +1,8 @@
 (require '[positano.analyze :refer :all]
          '[clojure.tools.analyzer.ast.query :as ast.query]
          '[refactor-nrepl.analyzer]
-         '[trinket.repl :as t])
+         '[trinket.repl :as t]
+         '[clojure.pprint :as pp])
 
 (def ast (analyze-ns 'positano.reflect))
 ;; OR
@@ -182,7 +183,8 @@
 
 ;;;;;;;;;; dashboard ;;;;;;;;;;
 
-(def the-db (doall (analyze-dir "/Users/sideris/devel/work/bsq/vittle-dashboard/src")))
+(def ast (analyze-dir "/Users/sideris/devel/work/bsq/vittle-dashboard/src"))
+(def the-db (doall (db ast)))
 
 (sort-by
  first
@@ -215,3 +217,36 @@
     [(= ?name "list-execution-events")]
     (caller ?def ?var)]
   the-db))
+
+(seq
+ (ast-q
+  '[:find ?var
+    :in $ %
+    :where
+    (def ?def ?name)
+    [(= ?name "tabular-executions")]
+    (caller ?def ?var)]
+  the-db))
+
+;;get all keywords
+(seq
+ (ast-q
+  '[:find ?k
+    :in $ %
+    :where
+    (keyword ?op ?k)]
+  the-db))
+
+;;get all keywords used as functions (and where)
+(->>
+ (ast-q
+  '[:find ?k ?file ?line
+    :in $ %
+    :where
+    (keyword-invoke ?op ?k)
+    (file ?op ?file)
+    (line ?op ?line)]
+  the-db)
+ (map (partial zipmap [:k :file :line]))
+ (sort-by (juxt :file :line))
+ pp/print-table)

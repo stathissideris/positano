@@ -18,7 +18,15 @@
 (defn var-name [v] (subs (str v) 2))
 
 (def query-rules
-  '[[(def ?def ?name)
+  '[[(file ?op ?x)
+     (?op :meta ?meta)
+     (?meta :file ?x)]
+
+    [(line ?op ?x)
+     (?op :meta ?meta)
+     (?meta :line ?x)]
+
+    [(def ?def ?name)
      [?def :op :def]
      [?def :name ?symbol-name]
      [(str ?symbol-name) ?name]] ;;because it's harder to query symbols
@@ -67,11 +75,23 @@
      [?fn :var ?raw-var]
      [(positano.analyze/var-name ?raw-var) ?var]]
 
-    [(invoke-local ?invoke ?fn)
+    [(keyword ?op ?k)
+     [?op :op :const]
+     [?op :type :keyword]
+     [?op :val ?k]]
+
+    [(keyword-invoke ?op ?k)
+     [?op :op :keyword-invoke]
+     [?op :keyword ?kop]
+     (keyword ?kop ?k)]
+
+    [(invoke-local ?invoke ?fn) ;;this needs fixing because it returns a large part of the AST
      [?invoke :op :invoke]
      [?invoke :fn ?fn]
      [?fn :op :local]]
 
+    ;; + add
+    ;; = equiv
     [(static-call ?static-call ?method)
      [?static-call :op :static-call]
      [?static-call :method ?method]]
@@ -95,8 +115,9 @@
     [(caller ?a ?b)
      [ancestor ?a ?x]
      (or (invoke-var ?x ?b)
-         (invoke-local ?x ?b)
-         (static-call ?x ?b))]])
+         ;;(invoke-local ?x ?b)
+         (static-call ?x ?b)
+         )]])
 
 (defn walk-select-keys [m ks]
   (walk/prewalk
@@ -175,8 +196,7 @@
 (defn analyze-dir [path]
   (->> (file-seq (io/file path))
        (mapcat #(analyze-file (.getPath %)))
-       (remove nil?)
-       (db)))
+       (remove nil?)))
 
 (defn ast-q [q db]
     (d/q q db query-rules))
