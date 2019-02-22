@@ -1,11 +1,16 @@
 (ns positano.analyze
   (:require [clojure.walk :as walk]
-            [clojure.tools.analyzer.jvm :as ana]
+            [clojure.string :as str]
+            [clojure.java.io :as io]
+            [clojure.tools.analyzer.jvm :as jvm]
+
+            [cljs.analyzer.api :as cljs]
             [clojure.tools.analyzer.passes.jvm.emit-form :as e]
             [clojure.tools.analyzer.ast :as ast]
             [clojure.tools.analyzer.ast.query :as ast.query]
             [refactor-nrepl.analyzer]
             [clojure.pprint :refer [pprint]]
+            [refactor-nrepl.analyzer]
             ;;[datascript.core :as d]
             [datomic.api :as d])
   (:import [java.io File]))
@@ -67,19 +72,19 @@
      [?invoke :fn ?fn]
      [?fn :op :local]]
 
+    [(static-call ?static-call ?method)
+     [?static-call :op :static-call]
+     [?static-call :method ?method]]
+
     [(env ?form ?env)
      [?form :env ?env]]
 
-    [(parent ?parent ?child)
-     [?parent :init ?child]]
-    [(parent ?parent ?child)
-     [?parent :expr ?child]]
-    [(parent ?parent ?child)
-     [?parent :methods ?child]]
-    [(parent ?parent ?child)
-     [?parent :body ?child]]
-    [(parent ?parent ?child)
-     [?parent :args ?child]]
+    [(parent ?parent ?child) [?parent :init ?child]]
+    [(parent ?parent ?child) [?parent :expr ?child]]
+    [(parent ?parent ?child) [?parent :methods ?child]]
+    [(parent ?parent ?child) [?parent :body ?child]]
+    [(parent ?parent ?child) [?parent :args ?child]]
+    [(parent ?parent ?child) [?parent :bindings ?child]]
 
     [(ancestor ?a ?b)
      [parent ?a ?b]]
@@ -89,7 +94,9 @@
 
     [(caller ?a ?b)
      [ancestor ?a ?x]
-     [invoke-var ?x ?b]]])
+     (or (invoke-var ?x ?b)
+         (invoke-local ?x ?b)
+         (static-call ?x ?b))]])
 
 (defn walk-select-keys [m ks]
   (walk/prewalk
@@ -134,13 +141,42 @@
   [asts]
   (mapcat ast->eav asts))
 
-(defn ast-q [q ast]
-    (d/q q (db ast) query-rules))
+(defn analyze-file [filename]
+  (cond (str/ends-with? filename ".clj")
+        (do
+          (println "Analyzing:" filename)
+          (refactor-nrepl.analyzer/ns-ast (slurp filename)))
 
-(defn analyze-dir! [conn dir] ;;TODO fix this function
-  (doseq [f (file-seq (File. dir))]
-    (when-not (.isDirectory f) ;;maybe check extension too
-      (println "Analyzing" (.getPath f))
-      (let [ast (refactor-nrepl.analyzer/ns-ast (slurp f))]
-        ;;(d/transact conn (fix-ast ast))
-        ))))
+        ;; (str/ends-with? filename ".cljs")
+        ;; (binding [cljs.analyzer/*verbose* true]
+        ;;   (cljs/analyze-file (File. filename) {:verbose true}))
+
+
+        ;; Stathis Sideris [10:21 AM]
+        ;; I’m using this in an attempt to get an AST for my cljs source:
+        ;; `(cljs/cljs.analyzer.api (File. filename))`
+        ;; But it fails with `No such namespace: cljsjs.react` which is a transitive dependency to my project via re-frame. Is it a problem with the project setup or am I using the analyzer incorrectly?
+        ;;
+        ;;
+        ;; Thomas Heller [10:36 AM]
+        ;; @stathissideris the analyzer must be initialized with the `:foreign-lib` data from `deps.cljs` files
+        ;; I'm not quite sure what call that was. you'll probably find it in `cljs.closure`
+
+
+        ;; (do
+        ;;   (let [env (cljs/empty-state)]
+        ;;     (cljs/analyze-file env (File. filename))
+        ;;     env))
+        ))
+
+(defn analyze-ns [ns-sym]
+  (jvm/analyze-ns ns-sym))
+
+(defn analyze-dir [path]
+  (->> (file-seq (io/file path))
+       (mapcat #(analyze-file (.getPath %)))
+       (remove nil?)
+       (db)))
+
+(defn ast-q [q db]
+    (d/q q db query-rules))

@@ -1,12 +1,13 @@
 (require '[positano.analyze :refer :all]
          '[clojure.tools.analyzer.ast.query :as ast.query]
-         '[clojure.tools.analyzer.jvm :as ana]
+         '[refactor-nrepl.analyzer]
          '[trinket.repl :as t])
 
-(def ast
-  (ana/analyze-ns 'positano.reflect))
+(def ast (analyze-ns 'positano.reflect))
+;; OR
+(def ast (analyze-file "src/positano/reflect.clj"))
 
-(-> ast ast.query/db first first pprint)
+(def ast (analyze-dir "/Users/sideris/devel/work/gt/taz/src/"))
 
 (ast-q
  '[:find ?ns ?name
@@ -177,3 +178,40 @@
                            :var #'clojure.core/resolve}
                     :args [{:op   :local
                             :form 'fun}]}}]}
+
+
+;;;;;;;;;; dashboard ;;;;;;;;;;
+
+(def the-db (doall (analyze-dir "/Users/sideris/devel/work/bsq/vittle-dashboard/src")))
+
+(sort-by
+ first
+ (ast-q
+  '[:find ?ns ?name
+    :in $ %
+    :where
+    (def ?def ?name)
+    (ns ?def ?ns)]
+  the-db))
+
+(seq
+ (ast-q
+  '[:find ?var
+    :in $ %
+    :where
+    (def ?def ?name)
+    [(= ?name "list-execution-events")]
+    (ancestor ?def ?invoke)
+    (or (invoke-var ?invoke ?var)
+        (static-call ?invoke ?var))]
+  the-db))
+
+(seq
+ (ast-q
+  '[:find ?var
+    :in $ %
+    :where
+    (def ?def ?name)
+    [(= ?name "list-execution-events")]
+    (caller ?def ?var)]
+  the-db))
