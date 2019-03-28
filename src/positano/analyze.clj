@@ -19,12 +19,12 @@
 
 (def query-rules
   '[[(file ?op ?x)
-     (?op :meta ?meta)
-     (?meta :file ?x)]
+     (?op :env ?env)
+     (?env :file ?x)]
 
     [(line ?op ?x)
-     (?op :meta ?meta)
-     (?meta :line ?x)]
+     (?op :env ?env)
+     (?env :line ?x)]
 
     [(def ?def ?name)
      [?def :op :def]

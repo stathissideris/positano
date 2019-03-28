@@ -1,8 +1,9 @@
 (require '[positano.analyze :refer :all]
          '[clojure.tools.analyzer.ast.query :as ast.query]
          '[refactor-nrepl.analyzer]
-         '[trinket.repl :as t]
-         '[clojure.pprint :as pp])
+         ;'[trinket.repl :as t]
+         '[clojure.pprint :as pp]
+         '[clojure.java.io :as io])
 
 (def ast (analyze-ns 'positano.reflect))
 ;; OR
@@ -180,8 +181,55 @@
                     :args [{:op   :local
                             :form 'fun}]}}]}
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;                            taz                             ;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;;;;;;;;; dashboard ;;;;;;;;;;
+(do
+  (def ast (analyze-dir "/Users/sideris/devel/work/gt/taz/src/"))
+  (def the-db (doall (db ast))))
+
+(->>
+ (ast-q
+  '[:find ?k
+    :in $ %
+    :where
+    (keyword ?op ?k)]
+  the-db)
+ (map first)
+ distinct
+ (filter namespace)
+ sort)
+
+(def slurp-code
+  (memoize
+   (fn [filename]
+     (with-open [r (io/reader filename)]
+       (doall (line-seq r))))))
+
+(defn- extract-line [filename line-number]
+  (let [code-seq (slurp-code filename)]
+    (nth code-seq (dec line-number))))
+
+(->>
+ (ast-q
+  '[:find ?k ?file ?line
+    :in $ %
+    :where
+    (keyword ?op ?k)
+    (file ?op ?file)
+    (line ?op ?line)]
+  the-db)
+ (map (partial zipmap [:k :file :line]))
+ (map (fn [{:keys [file line] :as row}]
+        (assoc row :snippet (extract-line file line))))
+ (sort-by (juxt :file :line))
+ pp/print-table)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;                         dashboard                          ;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def ast (analyze-dir "/Users/sideris/devel/work/bsq/vittle-dashboard/src"))
 (def the-db (doall (db ast)))
